@@ -96,7 +96,7 @@ JWT_SECRET=your_jwt_secret_key
 JWT_EXPIRES_IN=1d
 
 # Other configurations
-CORS_ORIGIN=http://localhost:3000
+CORS_ORIGIN=http://localhost:3001
 ```
 
 ## 🏃 Running the Application
@@ -164,7 +164,7 @@ Returns the status of the API.
 ```json
 {
   "status": "ok",
-  "timestamp": "2025-10-14T21:16:43.276Z"
+  "timestamp": "2024-01-01T12:00:00.000Z"
 }
 ```
 
