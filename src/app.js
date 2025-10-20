@@ -88,7 +88,7 @@ app.get('/health', (req, res) => {
 
 app.get('/ready', async (req, res) => {
   try {
-    const { sequelize } = require('./models');
+    const { sequelize } = require('../database/database');
     const redisClient = require('./config/redis');
 
     await sequelize.authenticate();
