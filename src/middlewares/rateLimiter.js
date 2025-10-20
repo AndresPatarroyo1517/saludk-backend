@@ -1,12 +1,8 @@
-const rateLimit = require('express-rate-limit');
-const RedisStore = require('rate-limit-redis');
+const { RateLimiterMemory } = require('rate-limiter-flexible');
 const redisClient = require('../config/redisClient');
 
-const globalLimiter = rateLimit({
-  store: new RedisStore({
-    client: redisClient,
-    prefix: 'rl:global:',
-  }),
+const globalLimiter = new RateLimiterMemory({
+  store: redisClient,
   windowMs: 60 * 1000, 
   max: 100, 
   message: {
@@ -17,11 +13,8 @@ const globalLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-const authLimiter = rateLimit({
-  store: new RedisStore({
-    client: redisClient,
-    prefix: 'rl:auth:',
-  }),
+const authLimiter = new RateLimiterMemory({
+  store: redisClient,
   windowMs: 15 * 60 * 1000, 
   max: 5, 
   skipSuccessfulRequests: true,
@@ -31,11 +24,8 @@ const authLimiter = rateLimit({
   },
 });
 
-const createLimiter = rateLimit({
-  store: new RedisStore({
-    client: redisClient,
-    prefix: 'rl:create:',
-  }),
+const createLimiter = new RateLimiterMemory({
+  store: redisClient,
   windowMs: 60 * 1000, 
   max: 10, 
   message: {
@@ -44,11 +34,8 @@ const createLimiter = rateLimit({
   },
 });
 
-const uploadLimiter = rateLimit({
-  store: new RedisStore({
-    client: redisClient,
-    prefix: 'rl:upload:',
-  }),
+const uploadLimiter = new RateLimiterMemory({
+  store: redisClient,
   windowMs: 60 * 1000,
   max: 5, 
   message: {

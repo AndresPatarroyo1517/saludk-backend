@@ -1,5 +1,5 @@
 const fileStorageService = require('../services/fileStorage');
-const { documento } = require('../models');
+const { Documento } = require('../models/documento');
 const logger = require('../utils/logger');
 
 class DocumentoController {
@@ -22,7 +22,7 @@ class DocumentoController {
         userId: pacienteId,
       });
 
-      const documento = await documento.create({
+      const documento = await Documento.create({
         solicitudId: solicitudId || null,
         pacienteId: pacienteId || null,
         nombre: file.originalname,
@@ -56,7 +56,7 @@ class DocumentoController {
     try {
       const { id } = req.params;
 
-      const documento = await documento.findByPk(id);
+      const documento = await Documento.findByPk(id);
 
       if (!documento) {
         return res.status(404).json({

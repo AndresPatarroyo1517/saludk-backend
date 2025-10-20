@@ -1,7 +1,7 @@
 const { DataTypes } = require('sequelize');
 
 module.exports = (sequelize) => {
-  const documento = sequelize.define('Documento', {
+  const Documento = sequelize.define('Documento', {
     id: {
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
@@ -67,5 +67,5 @@ module.exports = (sequelize) => {
     timestamps: false,
   });
 
-  return documento;
+  return Documento;
 };

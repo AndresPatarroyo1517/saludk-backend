@@ -1,6 +1,6 @@
 require('dotenv').config();
 const app = require('./src/app');
-const { connectWithRetry } = require('./src/config/database');
+const { sequelize, connectWithRetry } = require('./src/database/database');
 const logger = require('./src/utils/logger');
 
 const PORT = process.env.PORT || 3000;
@@ -11,7 +11,6 @@ const startServer = async () => {
 
 
     if (process.env.NODE_ENV === 'development') {
-      const { sequelize } = require('./src/models');
       await sequelize.sync({ alter: false });
       logger.info('✅ Database models synchronized');
     }

@@ -3,14 +3,13 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
-const mongoSanitize = require('express-mongo-sanitize');
-const xss = require('xss-clean');
+const joi = require('joi');
 const hpp = require('hpp');
 const logger = require('./utils/logger');
 const errorHandler = require('./middlewares/errorHandler');
 const requestLogger = require('./middlewares/requestLogger');
 const rateLimiter = require('./middlewares/rateLimiter');
-const routes = require('./routes');
+//const routes = require('./routes');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./docs/swagger');
 const { createBullBoard } = require('@bull-board/api');
@@ -31,7 +30,7 @@ app.use(helmet({
     },
   },
   hsts: {
-    maxAge: 31536000, // 1 año
+    maxAge: 31536000, 
     includeSubDomains: true,
     preload: true,
   },
@@ -58,13 +57,8 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-
-app.use(mongoSanitize()); 
-app.use(xss()); 
 app.use(hpp()); 
-
 app.use(compression());
-
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -81,11 +75,6 @@ if (process.env.NODE_ENV === 'development') {
 app.use(requestLogger);
 
 app.set('trust proxy', 1);
-
-app.use('/api/', rateLimiter.global);
-
-
-app.use(auditMiddleware);
 
 app.get('/health', (req, res) => {
   res.status(200).json({
@@ -153,7 +142,7 @@ if (process.env.NODE_ENV === 'development') {
   }
 }
 
-app.use('/api/v1', routes);
+//app.use('/api/v1', routes);
 
 app.get('/', (req, res) => {
   res.json({
@@ -217,20 +206,11 @@ if (process.env.NODE_ENV === 'development') {
   });
 }
 
-app.use("/hola", (req, res) => {
+app.get("/hola", (req, res) => {
   res.json({
     success: true,
     message: 'Hola Mundo',
     timestamp: new Date().toISOString(),
-  });
-});
-
-app.use('*', (req, res) => {
-  res.status(404).json({
-    success: false,
-    error: 'Endpoint not found',
-    path: req.originalUrl,
-    method: req.method,
   });
 });
 
