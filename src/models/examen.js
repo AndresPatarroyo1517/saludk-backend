@@ -1,88 +1,87 @@
 const Sequelize = require('sequelize');
 module.exports = function(sequelize, DataTypes) {
-  return sequelize.define('documento', {
+  return sequelize.define('examen', {
     id: {
       type: DataTypes.UUID,
       allowNull: false,
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true
     },
-    solicitud_id: {
+    historial_id: {
       type: DataTypes.UUID,
-      allowNull: true,
+      allowNull: false,
       references: {
-        model: 'solicitud_registro',
+        model: 'historial_medico',
         key: 'id'
       }
     },
-    paciente_id: {
+    cita_id: {
       type: DataTypes.UUID,
       allowNull: true,
       references: {
-        model: 'paciente',
+        model: 'cita',
         key: 'id'
       }
     },
-    nombre: {
-      type: DataTypes.STRING(255),
+    tipo_examen: {
+      type: DataTypes.STRING(100),
       allowNull: false
     },
-    ruta_storj: {
+    descripcion: {
       type: DataTypes.TEXT,
-      allowNull: false
-    },
-    tipo_archivo: {
-      type: DataTypes.STRING(50),
-      allowNull: false
-    },
-    tamano_bytes: {
-      type: DataTypes.BIGINT,
       allowNull: true
     },
-    hash_sha256: {
-      type: DataTypes.STRING(64),
+    resultado: {
+      type: DataTypes.TEXT,
       allowNull: true
     },
-    estado: {
-      type: DataTypes.STRING(20),
-      allowNull: true,
-      defaultValue: "PENDIENTE"
+    ruta_archivo_storj: {
+      type: DataTypes.TEXT,
+      allowNull: true
     },
-    fecha_carga: {
+    interpretacion: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+    fecha_realizacion: {
+      type: DataTypes.DATEONLY,
+      allowNull: false
+    },
+    fecha_registro: {
       type: DataTypes.DATE,
       allowNull: true,
       defaultValue: Sequelize.Sequelize.fn('now')
     }
   }, {
     sequelize,
-    tableName: 'documento',
+    tableName: 'examen',
     schema: 'public',
     timestamps: false,
     freezeTableName: true,
     indexes: [
       {
-        name: "documento_pkey",
+        name: "examen_pkey",
         unique: true,
         fields: [
           { name: "id" },
         ]
       },
       {
-        name: "idx_documento_hash",
+        name: "idx_examen_fecha",
         fields: [
-          { name: "hash_sha256" },
+          { name: "fecha_realizacion" },
         ]
       },
       {
-        name: "idx_documento_paciente",
+        name: "idx_examen_historial",
         fields: [
-          { name: "paciente_id" },
+          { name: "historial_id" },
         ]
       },
       {
-        name: "idx_documento_solicitud",
+        name: "idx_examen_tipo",
         fields: [
-          { name: "solicitud_id" },
+          { name: "tipo_examen" },
         ]
       },
     ]

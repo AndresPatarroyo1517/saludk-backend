@@ -1,88 +1,77 @@
 const Sequelize = require('sequelize');
 module.exports = function(sequelize, DataTypes) {
-  return sequelize.define('documento', {
+  return sequelize.define('direccion', {
     id: {
       type: DataTypes.UUID,
       allowNull: false,
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true
     },
-    solicitud_id: {
-      type: DataTypes.UUID,
-      allowNull: true,
-      references: {
-        model: 'solicitud_registro',
-        key: 'id'
-      }
-    },
     paciente_id: {
       type: DataTypes.UUID,
-      allowNull: true,
+      allowNull: false,
       references: {
         model: 'paciente',
         key: 'id'
       }
     },
-    nombre: {
-      type: DataTypes.STRING(255),
+    tipo: {
+      type: DataTypes.STRING(20),
       allowNull: false
     },
-    ruta_storj: {
+    direccion_completa: {
       type: DataTypes.TEXT,
       allowNull: false
     },
-    tipo_archivo: {
-      type: DataTypes.STRING(50),
+    ciudad: {
+      type: DataTypes.STRING(100),
       allowNull: false
     },
-    tamano_bytes: {
-      type: DataTypes.BIGINT,
-      allowNull: true
+    departamento: {
+      type: DataTypes.STRING(100),
+      allowNull: false
     },
-    hash_sha256: {
-      type: DataTypes.STRING(64),
-      allowNull: true
-    },
-    estado: {
-      type: DataTypes.STRING(20),
+    es_principal: {
+      type: DataTypes.BOOLEAN,
       allowNull: true,
-      defaultValue: "PENDIENTE"
+      defaultValue: false
     },
-    fecha_carga: {
+    fecha_creacion: {
       type: DataTypes.DATE,
       allowNull: true,
       defaultValue: Sequelize.Sequelize.fn('now')
     }
   }, {
     sequelize,
-    tableName: 'documento',
+    tableName: 'direccion',
     schema: 'public',
     timestamps: false,
     freezeTableName: true,
     indexes: [
       {
-        name: "documento_pkey",
+        name: "direccion_pkey",
         unique: true,
         fields: [
           { name: "id" },
         ]
       },
       {
-        name: "idx_documento_hash",
-        fields: [
-          { name: "hash_sha256" },
-        ]
-      },
-      {
-        name: "idx_documento_paciente",
+        name: "idx_direccion_paciente",
         fields: [
           { name: "paciente_id" },
         ]
       },
       {
-        name: "idx_documento_solicitud",
+        name: "idx_direccion_principal",
         fields: [
-          { name: "solicitud_id" },
+          { name: "paciente_id" },
+          { name: "es_principal" },
+        ]
+      },
+      {
+        name: "idx_direccion_tipo",
+        fields: [
+          { name: "tipo" },
         ]
       },
     ]

@@ -1,88 +1,81 @@
 const Sequelize = require('sequelize');
 module.exports = function(sequelize, DataTypes) {
-  return sequelize.define('documento', {
+  return sequelize.define('calificacion_medico', {
     id: {
       type: DataTypes.UUID,
       allowNull: false,
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true
     },
-    solicitud_id: {
-      type: DataTypes.UUID,
-      allowNull: true,
-      references: {
-        model: 'solicitud_registro',
-        key: 'id'
-      }
-    },
     paciente_id: {
       type: DataTypes.UUID,
-      allowNull: true,
+      allowNull: false,
       references: {
         model: 'paciente',
         key: 'id'
       }
     },
-    nombre: {
-      type: DataTypes.STRING(255),
-      allowNull: false
+    medico_id: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: {
+        model: 'medico',
+        key: 'id'
+      }
     },
-    ruta_storj: {
-      type: DataTypes.TEXT,
-      allowNull: false
+    cita_id: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: {
+        model: 'cita',
+        key: 'id'
+      },
+      unique: "unique_calificacion_cita"
     },
-    tipo_archivo: {
-      type: DataTypes.STRING(50),
-      allowNull: false
-    },
-    tamano_bytes: {
+    puntuacion: {
       type: DataTypes.BIGINT,
+      allowNull: false
+    },
+    comentario: {
+      type: DataTypes.TEXT,
       allowNull: true
     },
-    hash_sha256: {
-      type: DataTypes.STRING(64),
-      allowNull: true
-    },
-    estado: {
-      type: DataTypes.STRING(20),
-      allowNull: true,
-      defaultValue: "PENDIENTE"
-    },
-    fecha_carga: {
+    fecha_creacion: {
       type: DataTypes.DATE,
       allowNull: true,
       defaultValue: Sequelize.Sequelize.fn('now')
     }
   }, {
     sequelize,
-    tableName: 'documento',
+    tableName: 'calificacion_medico',
     schema: 'public',
     timestamps: false,
     freezeTableName: true,
     indexes: [
       {
-        name: "documento_pkey",
+        name: "calificacion_medico_pkey",
         unique: true,
         fields: [
           { name: "id" },
         ]
       },
       {
-        name: "idx_documento_hash",
+        name: "idx_calificacion_medico_medico",
         fields: [
-          { name: "hash_sha256" },
+          { name: "medico_id" },
         ]
       },
       {
-        name: "idx_documento_paciente",
+        name: "idx_calificacion_medico_paciente",
         fields: [
           { name: "paciente_id" },
         ]
       },
       {
-        name: "idx_documento_solicitud",
+        name: "unique_calificacion_cita",
+        unique: true,
         fields: [
-          { name: "solicitud_id" },
+          { name: "cita_id" },
         ]
       },
     ]
