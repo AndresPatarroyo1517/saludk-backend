@@ -10,6 +10,7 @@ const errorHandler = require('./middlewares/errorHandler');
 const requestLogger = require('./middlewares/requestLogger');
 const rateLimiter = require('./middlewares/rateLimiter');
 //const routes = require('./routes');
+//const routes = require("./routes/pacienteroutes");
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./docs/swagger');
 const { createBullBoard } = require('@bull-board/api');
