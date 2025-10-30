@@ -1,5 +1,5 @@
 
-const Paciente = require("./paciente.model");
+const Paciente = require("./pacientemodel");
 
 module.exports = {
   Paciente,

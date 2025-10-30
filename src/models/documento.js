@@ -29,7 +29,7 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING(255),
       allowNull: false,
     },
-    rutaStorj: { // CAMBIADO: ruta_r2 -> rutaStorj
+    rutaStorj: { 
       type: DataTypes.TEXT,
       allowNull: false,
       field: 'ruta_storj',

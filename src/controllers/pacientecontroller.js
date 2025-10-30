@@ -1,5 +1,4 @@
-// src/controllers/paciente.controller.js
-const pacienteService = require("../services/paciente.service");
+const pacienteService = require("../services/pacienteservice");
 
 exports.registrarPaciente = async (req, res, next) => {
   try {

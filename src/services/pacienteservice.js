@@ -1,6 +1,6 @@
 
 const { Paciente } = require("../models");
-const storjService = require("./storj.service");
+const storjService = require("./storjservice");
 const logger = require("../utils/logger");
 
 exports.crearPaciente = async (datos, archivos) => {
