@@ -1,6 +1,6 @@
-import { ProcesadorPasarela } from './procesadores/procesadorPasarela.js';
-import { ProcesadorTarjeta } from './procesadores/procesadorTarjeta.js';
-import { ProcesadorConsignacion } from './procesadores/procesadorConsignacion.js';
+import { ProcesadorPasarela } from './factoryPagos/ProcesadorPasarela.js';
+import { ProcesadorTarjeta } from './factoryPagos/ProcesadorTarjeta.js';
+import { ProcesadorConsignacion } from './factoryPagos/ProcesadorConsignacion.js';
 
 export const crearProcesadorPago = (tipo) => {
   switch (tipo?.toUpperCase()) {

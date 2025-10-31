@@ -9,7 +9,7 @@ import errorHandler from './middlewares/errorHandler.js';
 import requestLogger from './middlewares/requestLogger.js';
 import SuscripcionRoutes from './routes/suscripcionRoutes.js';
 import PlanRoutes from './routes/planRoutes.js';
-import registroRoutes from './routes/registroRoute.js';
+import registroRoutes from './routes/registroRoutes.js';
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './docs/swagger.js';
 import { createBullBoard } from '@bull-board/api';

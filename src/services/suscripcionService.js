@@ -1,5 +1,5 @@
-import SuscripcionRepository from './suscripcionRepository.js';
-import PagoFactory from './pagoFactory.js';
+import SuscripcionRepository from '../repositories/suscripcionRepository.js';
+import PagoFactory from '../jobs/pagoFactory.js';
 import logger from '../utils/logger.js';
 
 const crearSuscripcion = async (pacienteId, planId, metodoPago = 'PSE') => {
