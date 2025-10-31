@@ -1,5 +1,5 @@
-const redis = require('./redisClient');
-const Redlock = require('redlock');
+import redis from './redisClient.js';
+import Redlock from 'redlock';
 
 const DEFAULT_TTL = Number(process.env.CACHE_TTL_SECONDS || 60);
 const KEY_PREFIX = process.env.CACHE_PREFIX || 'app:cache:';

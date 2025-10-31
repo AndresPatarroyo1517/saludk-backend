@@ -1,6 +1,6 @@
-const fileStorageService = require('../services/fileStorage');
-const { Documento } = require('../models/documento');
-const logger = require('../utils/logger');
+import fileStorageService from '../services/fileStorage.js';
+import { Documento } from '../models/documento.js';
+import logger from '../utils/logger.js';
 
 class DocumentoController {
   async uploadDocumento(req, res) {

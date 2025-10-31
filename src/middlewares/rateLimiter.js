@@ -1,5 +1,5 @@
-const { RateLimiterMemory } = require('rate-limiter-flexible');
-const redisClient = require('../config/redisClient');
+import { RateLimiterMemory } from 'rate-limiter-flexible';
+import redisClient from '../config/redisClient.js';
 
 const globalLimiter = new RateLimiterMemory({
   store: redisClient,

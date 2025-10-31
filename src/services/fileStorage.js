@@ -1,15 +1,16 @@
-const { 
-    PutObjectCommand, 
-    GetObjectCommand, 
-    DeleteObjectCommand,
-    HeadObjectCommand,
-    ListObjectsV2Command
-  } = require('@aws-sdk/client-s3');
-  const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
-  const { storjClient, bucketName } = require('../config/storj');
-  const logger = require('../utils/logger');
-  const crypto = require('crypto');
-  const path = require('path');
+import {
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { storjClient, bucketName } from '../config/storj.js';
+import logger from '../utils/logger.js';
+import crypto from 'crypto';
+import path from 'path';
+
   
   class FileStorageService {
     /**
@@ -232,4 +233,4 @@ const {
     }
   }
   
-  module.exports = new FileStorageService();
+export default new FileStorageService();

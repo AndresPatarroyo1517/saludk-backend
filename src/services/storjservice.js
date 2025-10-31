@@ -1,8 +1,7 @@
-
-const fs = require("fs");
-const path = require("path");
-const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
-const logger = require("../utils/logger");
+import fs from "fs";
+import path from "path";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import logger from "../utils/logger.js";
 
 const endpoint = process.env.STORJ_ENDPOINT;
 const bucket = process.env.STORJ_BUCKET_NAME;
@@ -17,7 +16,7 @@ const s3 = new S3Client({
   forcePathStyle: true,
 });
 
-exports.subirArchivo = async (archivo) => {
+export const subirArchivo = async (archivo) => {
   if (!archivo) throw new Error("Archivo inválido");
   const fileStream = fs.createReadStream(archivo.path);
   const key = `${Date.now()}_${archivo.originalname.replace(/\s+/g, "_")}`;

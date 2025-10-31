@@ -1,5 +1,9 @@
+<<<<<<< HEAD
 const path = require('path');
 const swaggerJsdoc = require('swagger-jsdoc');
+=======
+import swaggerJsdoc from 'swagger-jsdoc';
+>>>>>>> origin/main
 
 // Construimos rutas absolutas para evitar problemas de paths relativos
 const routesGlob = path.join(__dirname, '..', 'routes', '*.js');
@@ -25,4 +29,4 @@ const options = {
 
 const swaggerSpec = swaggerJsdoc(options);
 
-module.exports = swaggerSpec;
+export default swaggerSpec;
