@@ -6,12 +6,14 @@ import usuarioModel from './usuario.js';
 import pacienteModel from './paciente.js';
 import medicoModel from './medico.js';
 import solicitudRegistroModel from './solicitud_registro.js';
+import resultadoValidacionModel from './resultado_validacion.js';
 
 // Inicializar modelos
 const Usuario = usuarioModel(sequelize, Sequelize.DataTypes);
 const Paciente = pacienteModel(sequelize, Sequelize.DataTypes);
 const Medico = medicoModel(sequelize, Sequelize.DataTypes);
 const SolicitudRegistro = solicitudRegistroModel(sequelize, Sequelize.DataTypes);
+const ResultadoValidacion = resultadoValidacionModel(sequelize, Sequelize.DataTypes)
 
 // Definir asociaciones (relaciones entre modelos)
 // Usuario - Paciente (uno a uno)
@@ -54,6 +56,11 @@ SolicitudRegistro.belongsTo(Usuario, {
   as: 'revisador' 
 });
 
+// SolicitudRegistro - ResultadoValidacion (1—N)
+SolicitudRegistro.hasMany(ResultadoValidacion, { foreignKey: 'solicitud_id', as: 'validaciones' });
+ResultadoValidacion.belongsTo(SolicitudRegistro, { foreignKey: 'solicitud_id', as: 'solicitud' });
+
+
 // Exportar todos los modelos
 const db = {
   sequelize,
@@ -61,7 +68,8 @@ const db = {
   Usuario,
   Paciente,
   Medico,
-  SolicitudRegistro
+  SolicitudRegistro,
+  ResultadoValidacion
 };
 
 export default db;
