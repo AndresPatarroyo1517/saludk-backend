@@ -1,5 +1,5 @@
-const SuscripcionService = require('../services/suscripcionService');
-const logger = require('../utils/logger');
+import SuscripcionService from '../services/suscripcionService.js';
+import logger from '../utils/logger.js';
 
 class SuscripcionController {
   async crearSuscripcion(req, res) {
@@ -65,4 +65,4 @@ class SuscripcionController {
   }
 }
 
-module.exports = new SuscripcionController();
+export default new SuscripcionController();

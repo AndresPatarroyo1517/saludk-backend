@@ -1,7 +1,8 @@
-const express = require('express');
+import express from 'express';
+import db from '../models/index.js';
+import logger from '../utils/logger.js';
+
 const router = express.Router();
-const db = require('../models/index');
-const logger = require('../utils/logger');
 
 /**
  * @swagger
@@ -78,4 +79,4 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

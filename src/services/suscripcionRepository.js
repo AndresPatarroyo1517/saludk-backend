@@ -1,11 +1,11 @@
-const db = require('../models/index');
-const { v4: uuidv4 } = require('uuid');
-const logger = require('../utils/logger');
+import db from '../models/index.js';
+import { v4 as uuidv4 } from 'uuid';
+import logger from '../utils/logger.js';
 
 const Suscripcion = db.Suscripcion;
 const Plan = db.Plan;
 
-exports.create = async (pacienteId, planId) => {
+const create = async (pacienteId, planId) => {
   try {
     const plan = await Plan.findByPk(planId);
     if (!plan || !plan.activo) {
@@ -45,7 +45,7 @@ exports.create = async (pacienteId, planId) => {
   }
 };
 
-exports.findById = async (id) => {
+const findById = async (id) => {
   try {
     return await Suscripcion.findByPk(id);
   } catch (error) {
@@ -53,3 +53,5 @@ exports.findById = async (id) => {
     throw error;
   }
 };
+
+export default { create, findById };

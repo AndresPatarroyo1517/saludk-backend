@@ -89,7 +89,4 @@ const uploadMultiple = (fieldName, maxCount = 5) => {
   };
 };
 
-module.exports = {
-  uploadSingle,
-  uploadMultiple,
-};
+export { uploadSingle, uploadMultiple };

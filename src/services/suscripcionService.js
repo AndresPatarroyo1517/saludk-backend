@@ -1,35 +1,33 @@
-const SuscripcionRepository = require('./SuscripcionRepository');
-const PagoFactory = require('./pagoFactory');
-const logger = require('../utils/logger');
+import SuscripcionRepository from './suscripcionRepository.js';
+import PagoFactory from './pagoFactory.js';
+import logger from '../utils/logger.js';
 
-exports.crearSuscripcion = async (pacienteId, planId, metodoPago = 'PSE') => {
+const crearSuscripcion = async (pacienteId, planId, metodoPago = 'PSE') => {
   try {
-    // 1️⃣ Crear la suscripción en BD
+    // Crear la suscripción en BD
     const suscripcion = await SuscripcionRepository.create(pacienteId, planId);
 
     logger.info(`Suscripción ${suscripcion.id} creada. Iniciando generación de pago...`);
 
-    // 2️⃣ Crear el procesador adecuado según método de pago
+    // Crear el procesador adecuado según método de pago
     const procesador = PagoFactory.crearProcesadorPago(metodoPago);
 
-    // 3️⃣ Ejecutar el procesamiento de la transacción
+    // Ejecutar el procesamiento de la transacción
     const ordenPago = await procesador.procesarTransaccion({
       pacienteId,
       suscripcionId: suscripcion.id,
       monto: suscripcion.monto,
-      metodoPago
+      metodoPago,
     });
 
     return { suscripcion, ordenPago };
-
   } catch (error) {
     logger.error(`Error en SuscripcionService.crearSuscripcion: ${error.message}`);
     throw error;
   }
 };
 
-
-exports.procesarPago = async (pacienteId, suscripcionId, metodoPago = 'PSE') => {
+const procesarPago = async (pacienteId, suscripcionId, metodoPago = 'PSE') => {
   try {
     const suscripcion = await SuscripcionRepository.findById(suscripcionId);
 
@@ -44,7 +42,7 @@ exports.procesarPago = async (pacienteId, suscripcionId, metodoPago = 'PSE') => 
       pacienteId,
       suscripcionId,
       monto: suscripcion.monto,
-      metodoPago
+      metodoPago,
     });
 
     return resultado;
@@ -53,3 +51,5 @@ exports.procesarPago = async (pacienteId, suscripcionId, metodoPago = 'PSE') => 
     throw error;
   }
 };
+
+export default { crearSuscripcion, procesarPago };

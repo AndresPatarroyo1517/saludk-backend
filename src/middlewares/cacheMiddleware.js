@@ -31,4 +31,4 @@ function cacheMiddleware({ ttl = undefined, namespace = 'default', keyGenerator 
   };
 }
 
-module.exports = cacheMiddleware;
+export default cacheMiddleware;

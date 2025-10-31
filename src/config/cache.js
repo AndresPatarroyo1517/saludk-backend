@@ -88,11 +88,11 @@ async function getOrSet(key, loaderFn, ttl = DEFAULT_TTL, namespace = 'default')
   }
 }
 
-module.exports = {
+export default {
   get,
   set,
   del,
   getOrSet,
   invalidateNamespace,
-  makeKey 
+  makeKey,
 };

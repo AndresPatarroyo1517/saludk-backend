@@ -1,11 +1,11 @@
-const { ProcesadorPago } = require('./procesadorPago');
-const db = require('../../models/index');
-const { v4: uuidv4 } = require('uuid');
-const logger = require('../../utils/logger');
+import { ProcesadorPago } from './procesadorPago.js';
+import db from '../../models/index.js';
+import { v4 as uuidv4 } from 'uuid';
+import logger from '../../utils/logger.js';
 
 const OrdenPago = db.Orden_Pago;
 
-class ProcesadorConsignacion extends ProcesadorPago {
+export class ProcesadorConsignacion extends ProcesadorPago {
   async procesarTransaccion({ pacienteId, suscripcionId, monto }) {
     try {
       const orden = await OrdenPago.create({
@@ -19,7 +19,7 @@ class ProcesadorConsignacion extends ProcesadorPago {
         fecha_creacion: new Date(),
       });
 
-      logger.info(`Orden de pago creada vía CONSIGNACIÓN: ${orden.id}`);
+      logger.info(`Orden de pago creada vía CONSIGNACION: ${orden.id}`);
       return orden;
 
     } catch (error) {
@@ -29,4 +29,4 @@ class ProcesadorConsignacion extends ProcesadorPago {
   }
 }
 
-module.exports = { ProcesadorConsignacion };
+export default { ProcesadorConsignacion };

@@ -87,5 +87,4 @@ class DocumentoController {
     }
   }
 }
-
-module.exports = new DocumentoController();
+export default new DocumentoController();

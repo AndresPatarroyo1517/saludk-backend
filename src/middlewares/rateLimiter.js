@@ -37,14 +37,14 @@ const createLimiter = new RateLimiterMemory({
 const uploadLimiter = new RateLimiterMemory({
   store: redisClient,
   windowMs: 60 * 1000,
-  max: 5, 
+  max: 5,
   message: {
     success: false,
     error: 'Demasiados uploads, espere un momento',
   },
 });
 
-module.exports = {
+export default {
   global: globalLimiter,
   auth: authLimiter,
   create: createLimiter,

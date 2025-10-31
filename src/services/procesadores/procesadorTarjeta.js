@@ -1,11 +1,11 @@
-const { ProcesadorPago } = require('./procesadorPago');
-const db = require('../../models/index');
-const { v4: uuidv4 } = require('uuid');
-const logger = require('../../utils/logger');
+import { ProcesadorPago } from './procesadorPago.js';
+import db from '../../models/index.js';
+import { v4 as uuidv4 } from 'uuid';
+import logger from '../../utils/logger.js';
 
 const OrdenPago = db.Orden_Pago;
 
-class ProcesadorTarjeta extends ProcesadorPago {
+export class ProcesadorTarjeta extends ProcesadorPago {
   async procesarTransaccion({ pacienteId, suscripcionId, monto }) {
     try {
       const orden = await OrdenPago.create({
@@ -28,5 +28,3 @@ class ProcesadorTarjeta extends ProcesadorPago {
     }
   }
 }
-
-module.exports = { ProcesadorTarjeta };

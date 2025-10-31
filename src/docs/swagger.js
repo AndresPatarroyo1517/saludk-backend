@@ -1,9 +1,10 @@
-<<<<<<< HEAD
-const path = require('path');
-const swaggerJsdoc = require('swagger-jsdoc');
-=======
+import path from 'path';
+import { fileURLToPath } from 'url';
 import swaggerJsdoc from 'swagger-jsdoc';
->>>>>>> origin/main
+
+// __dirname replacement for ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Construimos rutas absolutas para evitar problemas de paths relativos
 const routesGlob = path.join(__dirname, '..', 'routes', '*.js');
@@ -20,8 +21,8 @@ const options = {
     servers: [
       {
         url: `http://localhost:${process.env.PORT || 3000}`,
-        description: 'Local server'
-      }
+        description: 'Local server',
+      },
     ],
   },
   apis: [routesGlob], // rutas donde están tus endpoints documentados

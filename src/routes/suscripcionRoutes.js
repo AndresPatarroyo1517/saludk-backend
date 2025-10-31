@@ -1,7 +1,8 @@
-const express = require('express');
+import express from 'express';
+import SuscripcionController from '../controllers/suscripcionController.js';
+import { authMiddleware } from '../middlewares/authMiddleware.js';
+
 const router = express.Router();
-const SuscripcionController = require('../controllers/suscripcionController');
-const { authMiddleware } = require('../middlewares/authMiddleware');
 
 /**
  * @swagger
@@ -59,9 +60,7 @@ const { authMiddleware } = require('../middlewares/authMiddleware');
  *       500:
  *         description: Error interno del servidor
  */
-router.post('/', authMiddleware, (req, res) =>
-  SuscripcionController.crearSuscripcion(req, res)
-);
+router.post('/', authMiddleware, (req, res) => SuscripcionController.crearSuscripcion(req, res));
 
 /**
  * @swagger
@@ -110,8 +109,6 @@ router.post('/', authMiddleware, (req, res) =>
  *       500:
  *         description: Error interno del servidor
  */
-router.post('/pago', authMiddleware, (req, res) =>
-  SuscripcionController.procesarPago(req, res)
-);
+router.post('/pago', authMiddleware, (req, res) => SuscripcionController.procesarPago(req, res));
 
-module.exports = router;
+export default router;
