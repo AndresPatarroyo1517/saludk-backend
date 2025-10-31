@@ -13,13 +13,18 @@ exports.create = async (pacienteId, planId) => {
       e.status = 400;
       throw e;
     }
+    // Calcular fechas: fecha_inicio hoy y fecha_vencimiento según la duración del plan
+    const fechaInicio = new Date();
+    const duracionMeses = Number(plan.duracion_meses) || 1;
+    const fechaVencimiento = new Date(fechaInicio);
+    fechaVencimiento.setMonth(fechaVencimiento.getMonth() + duracionMeses);
 
     const suscripcion = await Suscripcion.create({
       id: uuidv4(),
       paciente_id: pacienteId,
       plan_id: planId,
-      fecha_inicio: new Date(),
-      fecha_vencimiento: null,
+      fecha_inicio: fechaInicio,
+      fecha_vencimiento: fechaVencimiento,
       estado: 'PENDIENTE_PAGO',
       auto_renovable: false,
       consultas_virtuales_usadas: 0,

@@ -42,11 +42,15 @@ app.use(helmet({
 
 const corsOptions = {
   origin: (origin, callback) => {
+    // En desarrollo permitimos cualquier origen para facilitar pruebas desde Swagger UI
+    if (process.env.NODE_ENV === 'development') {
+      return callback(null, true);
+    }
+
     const allowedOrigins = process.env.FRONTEND_URL
       ? process.env.FRONTEND_URL.split(',')
-      : ['http://localhost:4200'];
-    
-    
+      : ['http://localhost:4200', `http://localhost:${process.env.PORT || 3000}`, `http://127.0.0.1:${process.env.PORT || 3000}`];
+
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {

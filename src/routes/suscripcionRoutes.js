@@ -33,7 +33,7 @@ const { authMiddleware } = require('../middlewares/authMiddleware');
  *             properties:
  *               planId:
  *                 type: string
- *                 example: "b72af9d1-9c33-4a7d-98b1-7fa4b98b4ab9"
+ *                 example: "874ce33a-b97a-4624-b3d7-3692d4c0fa5e"
  *               metodoPago:
  *                 type: string
  *                 enum: [PSE, TARJETA, CONSIGNACION]

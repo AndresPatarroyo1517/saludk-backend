@@ -7,6 +7,14 @@ const authMiddleware = (req, res, next) => {
     const pacienteId = req.headers['x-paciente-id']; // Lo envías desde Postman
 
     if (!pacienteId) {
+      // En desarrollo permitimos un ID simulado para facilitar pruebas desde Swagger UI
+      if (process.env.NODE_ENV === 'development') {
+        const devId = process.env.DEV_PACIENTE_ID || 'dev-paciente-id';
+        req.pacienteId = devId;
+        console.warn('authMiddleware: usando pacienteId de desarrollo ->', devId);
+        return next();
+      }
+
       return res.status(401).json({ message: 'Paciente no autenticado.' });
     }
 
