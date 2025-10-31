@@ -1,26 +1,67 @@
-const { sequelize } = require('../database/database');
-const { DataTypes } = require('sequelize');
+import { Sequelize } from 'sequelize';
+import { sequelize } from '../database/database.js';
 
-// Importar todos los modelos
-const PacienteModel = require('./paciente');
+// Importar todas las definiciones de modelos
+import usuarioModel from './usuario.js';
+import pacienteModel from './paciente.js';
+import medicoModel from './medico.js';
+import solicitudRegistroModel from './solicitud_registro.js';
 
 // Inicializar modelos
-const Paciente = PacienteModel(sequelize, DataTypes);
+const Usuario = usuarioModel(sequelize, Sequelize.DataTypes);
+const Paciente = pacienteModel(sequelize, Sequelize.DataTypes);
+const Medico = medicoModel(sequelize, Sequelize.DataTypes);
+const SolicitudRegistro = solicitudRegistroModel(sequelize, Sequelize.DataTypes);
 
-// Si tienes más modelos, inicialízalos aquí
-// const Usuario = require('./usuario')(sequelize, DataTypes);
-// const Cita = require('./cita')(sequelize, DataTypes);
+// Definir asociaciones (relaciones entre modelos)
+// Usuario - Paciente (uno a uno)
+Usuario.hasOne(Paciente, { 
+  foreignKey: 'usuario_id', 
+  as: 'paciente' 
+});
+Paciente.belongsTo(Usuario, { 
+  foreignKey: 'usuario_id', 
+  as: 'usuario' 
+});
 
-// Definir asociaciones si las hay
-// Paciente.belongsTo(Usuario, { foreignKey: 'usuario_id' });
-// Usuario.hasOne(Paciente, { foreignKey: 'usuario_id' });
+// Usuario - Medico (uno a uno)
+Usuario.hasOne(Medico, { 
+  foreignKey: 'usuario_id', 
+  as: 'medico' 
+});
+Medico.belongsTo(Usuario, { 
+  foreignKey: 'usuario_id', 
+  as: 'usuario' 
+});
+
+// Paciente - SolicitudRegistro (uno a uno)
+Paciente.hasOne(SolicitudRegistro, { 
+  foreignKey: 'paciente_id', 
+  as: 'solicitud' 
+});
+SolicitudRegistro.belongsTo(Paciente, { 
+  foreignKey: 'paciente_id', 
+  as: 'paciente' 
+});
+
+// Usuario (revisor) - SolicitudRegistro (uno a muchos)
+Usuario.hasMany(SolicitudRegistro, { 
+  foreignKey: 'revisado_por', 
+  as: 'solicitudes_revisadas' 
+});
+SolicitudRegistro.belongsTo(Usuario, { 
+  foreignKey: 'revisado_por', 
+  as: 'revisador' 
+});
 
 // Exportar todos los modelos
 const db = {
   sequelize,
+  Sequelize,
+  Usuario,
   Paciente,
-  // Usuario,
-  // Cita,
+  Medico,
+  SolicitudRegistro
 };
 
-module.exports = db;
+export default db;

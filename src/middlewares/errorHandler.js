@@ -1,6 +1,6 @@
-const logger = require('../utils/logger');
+import logger from '../utils/logger.js';
 
-module.exports = (err, req, res, next) => {
+const errorHandler = (err, req, res, next) => {
   logger.error('Error occurred:', {
     requestId: req.id,
     error: err.message,
@@ -59,3 +59,5 @@ module.exports = (err, req, res, next) => {
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 };
+
+export default errorHandler;

@@ -1,5 +1,5 @@
-const Redis = require('ioredis');
-const logger = require('../utils/logger')
+import Redis from 'ioredis';
+import logger from '../utils/logger.js'
 
 const nodesEnv = process.env.REDIS_NODES || '';
 const password = process.env.REDIS_PASSWORD || undefined;

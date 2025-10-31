@@ -1,21 +1,18 @@
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const compression = require('compression');
-const morgan = require('morgan');
-const joi = require('joi');
-const hpp = require('hpp');
-const logger = require('./utils/logger');
-const errorHandler = require('./middlewares/errorHandler');
-const requestLogger = require('./middlewares/requestLogger');
-const rateLimiter = require('./middlewares/rateLimiter');
-//const routes = require('./routes');
-const PacienteRoutes = require("./routes/pacienteRoutes");
-const swaggerUi = require('swagger-ui-express');
-const swaggerSpec = require('./docs/swagger');
-const { createBullBoard } = require('@bull-board/api');
-const { BullAdapter } = require('@bull-board/api/bullAdapter');
-const { ExpressAdapter } = require('@bull-board/express');
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import compression from 'compression';
+import morgan from 'morgan';
+import hpp from 'hpp';
+import logger from './utils/logger.js';
+import errorHandler from './middlewares/errorHandler.js';
+import requestLogger from './middlewares/requestLogger.js';
+import registroRoutes from './routes/registroRoute.js';
+import swaggerUi from 'swagger-ui-express';
+import swaggerSpec from './docs/swagger.js';
+import { createBullBoard } from '@bull-board/api';
+import { BullAdapter } from '@bull-board/api/bullAdapter';
+import { ExpressAdapter } from '@bull-board/express';
 
 
 const app = express();
@@ -232,8 +229,8 @@ process.on('uncaughtException', (error) => {
 
 //--------------------------------------------------Usar aqui las rutas que se creen---------------------------------
 
-app.use('/paciente', PacienteRoutes);
+app.use('/registro', registroRoutes);
 
 
 
-module.exports = app;
+export default app;

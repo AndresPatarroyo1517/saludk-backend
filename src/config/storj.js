@@ -1,5 +1,5 @@
-const { S3Client } = require('@aws-sdk/client-s3');
-const logger = require('../utils/logger');
+import { S3Client } from '@aws-sdk/client-s3';
+import logger from '../utils/logger.js';
 
 const storjConfig = {
   region: 'auto',
