@@ -7,16 +7,7 @@ import {
 } from "../services/registroService.js";
 import logger from '../utils/logger.js';
 
-/**
- * RegistroController
- * Maneja el registro de pacientes (con solicitud) y médicos (directo)
- */
-
-/**
- * POST /register/paciente
- * Crea Usuario (inactivo) + Paciente + Solicitud (PENDIENTE)
- */
-export const registrarPacienteController = async (req, res, next) => {
+export const registrarPacienteController = async (req, res) => {
   try {
     const { usuario, paciente } = req.body;
 
@@ -27,7 +18,6 @@ export const registrarPacienteController = async (req, res, next) => {
       });
     }
 
-    // Crea usuario (inactivo), paciente y solicitud
     const resultado = await crearSolicitudPaciente({ usuario, paciente });
 
     return res.status(201).json({
@@ -43,41 +33,25 @@ export const registrarPacienteController = async (req, res, next) => {
           numero_identificacion: resultado.paciente.numero_identificacion
         },
         usuario: {
+          id: resultado.usuario.id,
           email: resultado.usuario.email,
-          activo: resultado.usuario.activo // false
+          activo: resultado.usuario.activo
         },
         fecha_solicitud: resultado.solicitud.fecha_creacion
       }
     });
   } catch (error) {
     const status = error.status || 500;
-    const message = error.message || "Error al crear solicitud de paciente";
-    
-    logger.error(`Error al crear solicitud de paciente: ${message}`, {
-      error: error.stack,
-      status: status,
-      details: error.details,
-      originalError: error.originalError
-    });
+    logger.error(`Error al registrar paciente: ${error.message}`);
 
     return res.status(status).json({
       success: false,
-      message,
-      ...(process.env.NODE_ENV === 'development' && { 
-        error: error.stack,
-        details: error.details,
-        originalError: error.originalError?.message
-      })
+      message: error.message
     });
   }
 };
 
-/**
- * POST /register/medico
- * Crea Usuario (activo) + Médico directamente (sin solicitud)
- * Solo admin puede ejecutar esto
- */
-export const registrarMedicoController = async (req, res, next) => {
+export const registrarMedicoController = async (req, res) => {
   try {
     const { usuario, medico } = req.body;
 
@@ -111,43 +85,7 @@ export const registrarMedicoController = async (req, res, next) => {
     });
   } catch (error) {
     const status = error.status || 500;
-    const message = error.message || "Error al registrar médico";
-    
-    logger.error(`Error al registrar médico: ${message}`, {
-      error: error.stack,
-      status: status
-    });
-
-    return res.status(status).json({
-      success: false,
-      message,
-      ...(process.env.NODE_ENV === 'development' && { 
-        error: error.stack
-      })
-    });
-  }
-};
-
-/**
- * GET /register/solicitudes
- * Lista solicitudes según filtros
- * Solo Director Médico o Admin
- */
-export const listarSolicitudesController = async (req, res, next) => {
-  try {
-    const { estado } = req.query;
-
-    const solicitudes = await listarSolicitudesPendientes({ estado });
-
-    return res.status(200).json({
-      success: true,
-      message: "Solicitudes obtenidas exitosamente.",
-      data: solicitudes,
-      total: solicitudes.length
-    });
-  } catch (error) {
-    const status = error.status || 500;
-    logger.error(`Error al listar solicitudes: ${error.message}`);
+    logger.error(`Error al registrar médico: ${error.message}`);
 
     return res.status(status).json({
       success: false,
@@ -156,21 +94,34 @@ export const listarSolicitudesController = async (req, res, next) => {
   }
 };
 
-/**
- * PUT /register/solicitudes/:id/aprobar
- * Aprueba solicitud y activa el usuario
- * Solo Director Médico o Admin
- */
-export const aprobarSolicitudController = async (req, res, next) => {
+export const listarSolicitudesController = async (req, res) => {
+  try {
+    const { estado } = req.query;
+    const solicitudes = await listarSolicitudesPendientes({ estado });
+
+    return res.status(200).json({
+      success: true,
+      data: solicitudes,
+      total: solicitudes.length
+    });
+  } catch (error) {
+    logger.error(`Error al listar solicitudes: ${error.message}`);
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+export const aprobarSolicitudController = async (req, res) => {
   try {
     const { id } = req.params;
     const revisadoPor = req.user.id;
-
     const resultado = await aprobarSolicitud(id, revisadoPor);
 
     return res.status(200).json({
       success: true,
-      message: "Solicitud aprobada exitosamente. El usuario ahora está activo.",
+      message: "Solicitud aprobada exitosamente.",
       data: {
         solicitud_id: resultado.solicitud.id,
         estado: resultado.solicitud.estado,
@@ -178,22 +129,15 @@ export const aprobarSolicitudController = async (req, res, next) => {
       }
     });
   } catch (error) {
-    const status = error.status || 500;
     logger.error(`Error al aprobar solicitud: ${error.message}`);
-
-    return res.status(status).json({
+    return res.status(error.status || 500).json({
       success: false,
       message: error.message
     });
   }
 };
 
-/**
- * PUT /register/solicitudes/:id/rechazar
- * Rechaza solicitud y elimina usuario y paciente
- * Solo Director Médico o Admin
- */
-export const rechazarSolicitudController = async (req, res, next) => {
+export const rechazarSolicitudController = async (req, res) => {
   try {
     const { id } = req.params;
     const { motivo_decision } = req.body;
@@ -210,19 +154,15 @@ export const rechazarSolicitudController = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      message: "Solicitud rechazada. El usuario y paciente han sido eliminados.",
+      message: "Solicitud rechazada.",
       data: {
         solicitud_id: resultado.solicitud.id,
-        estado: resultado.solicitud.estado,
-        usuario_eliminado: resultado.usuario_eliminado,
-        paciente_eliminado: resultado.paciente_eliminado
+        estado: resultado.solicitud.estado
       }
     });
   } catch (error) {
-    const status = error.status || 500;
     logger.error(`Error al rechazar solicitud: ${error.message}`);
-
-    return res.status(status).json({
+    return res.status(error.status || 500).json({
       success: false,
       message: error.message
     });
