@@ -11,6 +11,8 @@ const requestLogger = require('./middlewares/requestLogger');
 const rateLimiter = require('./middlewares/rateLimiter');
 //const routes = require('./routes');
 const PacienteRoutes = require("./routes/pacienteRoutes");
+const SuscripcionRoutes = require("./routes/suscripcionRoutes");
+const PlanRoutes = require("./routes/planRoutes");
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./docs/swagger');
 const { createBullBoard } = require('@bull-board/api');
@@ -233,6 +235,9 @@ process.on('uncaughtException', (error) => {
 //--------------------------------------------------Usar aqui las rutas que se creen---------------------------------
 
 app.use('/paciente', PacienteRoutes);
+app.use('/suscripcion', SuscripcionRoutes);
+app.use('/planes', PlanRoutes);
+
 
 
 

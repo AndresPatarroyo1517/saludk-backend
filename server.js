@@ -6,6 +6,8 @@ const logger = require('./src/utils/logger');
 const PORT = process.env.PORT || 3000;
 
 const startServer = async () => {
+
+  console.log('Starting server...');
   try {
     await connectWithRetry();
 
