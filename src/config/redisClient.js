@@ -1,5 +1,5 @@
-const Redis = require('ioredis');
-const logger = require('../utils/logger')
+import Redis from 'ioredis';
+import logger from '../utils/logger.js'
 
 const nodesEnv = process.env.REDIS_NODES || '';
 const password = process.env.REDIS_PASSWORD || undefined;
@@ -50,4 +50,4 @@ async function shutdown() {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-module.exports = client;
+export default client;

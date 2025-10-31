@@ -1,5 +1,5 @@
-const redis = require('./redisClient');
-const Redlock = require('redlock');
+import redis from './redisClient.js';
+import Redlock from 'redlock';
 
 const DEFAULT_TTL = Number(process.env.CACHE_TTL_SECONDS || 60);
 const KEY_PREFIX = process.env.CACHE_PREFIX || 'app:cache:';
@@ -88,11 +88,11 @@ async function getOrSet(key, loaderFn, ttl = DEFAULT_TTL, namespace = 'default')
   }
 }
 
-module.exports = {
+export default {
   get,
   set,
   del,
   getOrSet,
   invalidateNamespace,
-  makeKey 
+  makeKey,
 };

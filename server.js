@@ -1,11 +1,13 @@
-require('dotenv').config();
-const app = require('./src/app');
-const { sequelize, connectWithRetry } = require('./src/database/database');
-const logger = require('./src/utils/logger');
+import 'dotenv/config';
+import app from './src/app.js';
+import { sequelize, connectWithRetry } from './src/database/database.js';
+import logger from './src/utils/logger.js';
 
 const PORT = process.env.PORT || 3000;
 
 const startServer = async () => {
+
+  console.log('Starting server...');
   try {
     await connectWithRetry();
 

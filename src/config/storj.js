@@ -1,5 +1,5 @@
-const { S3Client } = require('@aws-sdk/client-s3');
-const logger = require('../utils/logger');
+import { S3Client, ListBucketsCommand } from '@aws-sdk/client-s3';
+import logger from '../utils/logger.js';
 
 const storjConfig = {
   region: 'auto',
@@ -41,8 +41,6 @@ if (process.env.NODE_ENV !== 'test') {
 const storjClient = new S3Client(storjConfig);
 
 const testStorjConnection = async () => {
-  const { ListBucketsCommand } = require('@aws-sdk/client-s3');
-  
   try {
     await storjClient.send(new ListBucketsCommand({}));
     logger.info('Storj conectada correctamente');
@@ -53,8 +51,8 @@ const testStorjConnection = async () => {
   }
 };
 
-module.exports = { 
+export { 
   storjClient, 
   testStorjConnection,
-  bucketName: process.env.STORJ_BUCKET_NAME 
+  bucketName
 };

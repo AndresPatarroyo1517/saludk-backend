@@ -1,7 +1,7 @@
-const { v4: uuidv4 } = require('uuid');
-const logger = require('../utils/logger');
+import { v4 as uuidv4 } from 'uuid';
+import logger from '../utils/logger.js';
 
-module.exports = (req, res, next) => {
+const requestLogger = (req, res, next) => {
   req.id = uuidv4();
   
   const start = Date.now();
@@ -31,3 +31,5 @@ module.exports = (req, res, next) => {
   
   next();
 };
+
+export default requestLogger;

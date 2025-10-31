@@ -1,4 +1,4 @@
-const cache = require('../config/cache');
+import cache from '../config/cache.js';
 
 function cacheMiddleware({ ttl = undefined, namespace = 'default', keyGenerator = null } = {}) {
   return async function (req, res, next) {
@@ -31,4 +31,4 @@ function cacheMiddleware({ ttl = undefined, namespace = 'default', keyGenerator 
   };
 }
 
-module.exports = cacheMiddleware;
+export default cacheMiddleware;

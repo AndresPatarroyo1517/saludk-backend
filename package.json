@@ -1,6 +1,7 @@
 {
   "name": "saludk-backend",
   "version": "1.0.0",
+  "type": "module",
   "description": "Backend sistema de salud SaludK - Arquitectura de Software",
   "main": "server.js",
   "scripts": {
@@ -37,6 +38,7 @@
     "@bull-board/api": "^6.13.1",
     "@bull-board/express": "^6.13.1",
     "axios": "^1.12.2",
+    "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.2",
     "body-parser": "^2.2.0",
     "bull": "^4.16.5",

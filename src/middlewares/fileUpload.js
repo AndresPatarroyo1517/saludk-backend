@@ -1,6 +1,5 @@
-const multer = require('multer');
-const crypto = require('crypto');
-
+import multer from 'multer';
+import crypto from 'crypto';
 const storage = multer.memoryStorage();
 
 
@@ -90,7 +89,4 @@ const uploadMultiple = (fieldName, maxCount = 5) => {
   };
 };
 
-module.exports = {
-  uploadSingle,
-  uploadMultiple,
-};
+export { uploadSingle, uploadMultiple };

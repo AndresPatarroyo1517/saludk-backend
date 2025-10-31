@@ -1,7 +1,11 @@
-const winston = require('winston');
-const DailyRotateFile = require('winston-daily-rotate-file');
-const path = require('path');
-const fs = require('fs');
+import winston from 'winston';
+import DailyRotateFile from 'winston-daily-rotate-file';
+import path, { dirname } from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const logsDir = path.join(__dirname, '../../logs');
 if (!fs.existsSync(logsDir)) {
@@ -111,12 +115,6 @@ const logger = winston.createLogger({
   format: process.env.NODE_ENV === 'production' ? prodFormat : devFormat,
 });
 
-/**
- * Log de auditoría para acciones críticas en datos médicos
- * @param {string} action - Acción realizada (CREATE, UPDATE, DELETE, ACCESS)
- * @param {string} entity - Entidad afectada (Paciente, HistorialMedico, etc.)
- * @param {object} metadata - Datos adicionales
- */
 logger.audit = (action, entity, metadata = {}) => {
   logger.info(`[AUDIT] ${action} - ${entity}`, {
     audit: true,
@@ -137,7 +135,7 @@ logger.security = (event, metadata = {}) => {
 };
 
 logger.performance = (operation, duration, metadata = {}) => {
-  const level = duration > 1000 ? 'warn' : 'info'; // Warn si > 1 segundo
+  const level = duration > 1000 ? 'warn' : 'info';
   logger[level](`[PERFORMANCE] ${operation} - ${duration}ms`, {
     performance: true,
     operation,
@@ -191,4 +189,4 @@ if (process.env.NODE_ENV !== 'test') {
   logger.info('='.repeat(50));
 }
 
-module.exports = logger;
+export default logger;

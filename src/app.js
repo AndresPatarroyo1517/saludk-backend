@@ -1,22 +1,20 @@
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const compression = require('compression');
-const morgan = require('morgan');
-const joi = require('joi');
-const hpp = require('hpp');
-const logger = require('./utils/logger');
-const errorHandler = require('./middlewares/errorHandler');
-const requestLogger = require('./middlewares/requestLogger');
-const rateLimiter = require('./middlewares/rateLimiter');
-//const routes = require('./routes');
-const PacienteRoutes = require("./routes/pacienteRoutes");
-const swaggerUi = require('swagger-ui-express');
-const swaggerSpec = require('./docs/swagger');
-const { createBullBoard } = require('@bull-board/api');
-const { BullAdapter } = require('@bull-board/api/bullAdapter');
-const { ExpressAdapter } = require('@bull-board/express');
-
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import compression from 'compression';
+import morgan from 'morgan';
+import hpp from 'hpp';
+import logger from './utils/logger.js';
+import errorHandler from './middlewares/errorHandler.js';
+import requestLogger from './middlewares/requestLogger.js';
+import SuscripcionRoutes from './routes/suscripcionRoutes.js';
+import PlanRoutes from './routes/planRoutes.js';
+import registroRoutes from './routes/registroRoute.js';
+import swaggerUi from 'swagger-ui-express';
+import swaggerSpec from './docs/swagger.js';
+import { createBullBoard } from '@bull-board/api';
+import { BullAdapter } from '@bull-board/api/bullAdapter';
+import { ExpressAdapter } from '@bull-board/express';
 
 const app = express();
 
@@ -40,11 +38,15 @@ app.use(helmet({
 
 const corsOptions = {
   origin: (origin, callback) => {
+    // En desarrollo permitimos cualquier origen para facilitar pruebas desde Swagger UI
+    if (process.env.NODE_ENV === 'development') {
+      return callback(null, true);
+    }
+
     const allowedOrigins = process.env.FRONTEND_URL
       ? process.env.FRONTEND_URL.split(',')
-      : ['http://localhost:4200'];
-    
-    
+      : ['http://localhost:4200', `http://localhost:${process.env.PORT || 3000}`, `http://127.0.0.1:${process.env.PORT || 3000}`];
+
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -89,11 +91,13 @@ app.get('/health', (req, res) => {
 
 app.get('/ready', async (req, res) => {
   try {
-    const { sequelize } = require('../database/database');
-    const redisClient = require('./config/redis');
+    const dbModule = await import('../database/database.js');
+    const { sequelize } = dbModule;
+
+    const redisModule = await import('./config/redisClient.js');
+    const redisClient = redisModule.default || redisModule;
 
     await sequelize.authenticate();
-    
     await redisClient.ping();
 
     res.status(200).json({
@@ -126,8 +130,9 @@ app.get('/api/docs.json', (req, res) => {
 
 if (process.env.NODE_ENV === 'development') {
   try {
-    const queues = require('./jobs');
-    
+    const jobsModule = await import('./jobs.js');
+    const queues = jobsModule.default || jobsModule;
+
     const serverAdapter = new ExpressAdapter();
     serverAdapter.setBasePath('/admin/queues');
 
@@ -166,8 +171,9 @@ app.post('/admin/cache/invalidate', async (req, res) => {
       });
     }
 
-    const cacheService = require('./services/cache.service');
-    const removed = await cacheService.invalidateNamespace(namespace);
+  const cacheModule = await import('./services/cache.service.js');
+  const cacheService = cacheModule.default || cacheModule;
+  const removed = await cacheService.invalidateNamespace(namespace);
     
     logger.info(`Cache namespace invalidated: ${namespace}`);
     
@@ -188,8 +194,10 @@ app.post('/admin/cache/invalidate', async (req, res) => {
 if (process.env.NODE_ENV === 'development') {
   app.post('/admin/cache/flush', async (req, res) => {
     try {
-      const redisClient = require('./config/redis');
-      await redisClient.flushall();
+  const redisModule = await import('./config/redisClient.js');
+  const redisClient = redisModule.default || redisModule;
+  if (redisClient.flushall) await redisClient.flushall();
+  else if (typeof redisClient.flushAll === 'function') await redisClient.flushAll();
       
       logger.warn('⚠️  CACHE FLUSHED COMPLETELY');
       
@@ -232,8 +240,10 @@ process.on('uncaughtException', (error) => {
 
 //--------------------------------------------------Usar aqui las rutas que se creen---------------------------------
 
-app.use('/paciente', PacienteRoutes);
+app.use('/suscripcion', SuscripcionRoutes);
+app.use('/planes', PlanRoutes);
+app.use('/registro', registroRoutes);
 
 
 
-module.exports = app;
+export default app;

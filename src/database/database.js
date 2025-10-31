@@ -1,6 +1,7 @@
-const { Sequelize } = require('sequelize');
-const logger = require('../utils/logger');
-require('dotenv').config();
+import { Sequelize } from 'sequelize';
+import logger from '../utils/logger.js';
+import dotenv from 'dotenv';
+dotenv.config();
 
 // Variables de entorno
 const username = process.env.DB_USERNAME;
@@ -110,8 +111,8 @@ const closeConnection = async () => {
   }
 };
 
-module.exports = { 
+export  {
   sequelize, 
   connectWithRetry,
   closeConnection 
-};
+}

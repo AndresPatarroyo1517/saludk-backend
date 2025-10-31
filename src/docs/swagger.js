@@ -1,16 +1,33 @@
-const swaggerJsdoc = require('swagger-jsdoc');
+import path from 'path';
+import { fileURLToPath } from 'url';
+import swaggerJsdoc from 'swagger-jsdoc';
+
+// __dirname replacement for ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Construimos rutas absolutas para evitar problemas de paths relativos
+const routesGlob = path.join(__dirname, '..', 'routes', '*.js');
 
 const options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'Tu API',
+      title: 'SaludK API',
       version: '1.0.0',
+      description: 'Documentación automática de la API generada desde comentarios JSDoc en las rutas',
     },
+    // Añadimos servers para que Swagger UI sepa el esquema/host por defecto
+    servers: [
+      {
+        url: `http://localhost:${process.env.PORT || 3000}`,
+        description: 'Local server',
+      },
+    ],
   },
-  apis: ['./routes/*.js'], // rutas donde están tus endpoints documentados
+  apis: [routesGlob], // rutas donde están tus endpoints documentados
 };
 
 const swaggerSpec = swaggerJsdoc(options);
 
-module.exports = swaggerSpec;
+export default swaggerSpec;
