@@ -16,13 +16,12 @@ export class FacadeBasesExternas {
     constructor({ adaptadorClinico, adaptadorPolicia, fraudeKeywords } = {}) {
         this.adaptadorClinico = adaptadorClinico;
         this.adaptadorPolicia = adaptadorPolicia;
-
         this.fraudeKeywords = Array.isArray(fraudeKeywords) && fraudeKeywords.length
             ? fraudeKeywords.map(k => String(k).toLowerCase())
             : ['fraude', 'estafa', 'falsificación', 'corrupción'];
     }
 
-    #derivarFraudeDesdeAntecedentes(antecedentes) {
+    #fraudeDesdeAntecedentes(antecedentes) {
         const registros = Array.isArray(antecedentes) ? antecedentes : [];
         const tieneFraude = registros.some((r) => {
             const texto = [
@@ -37,23 +36,19 @@ export class FacadeBasesExternas {
         return { tieneFraude, registros };
     }
 
-    async consultarBases(pacienteId) {
+    async consultarBases(identidad) {
         const [clinicoRes, policiaRes] = await Promise.allSettled([
-            this.adaptadorClinico.consultarPaciente(pacienteId),
-            this.adaptadorPolicia.consultarPaciente(pacienteId)
+            this.adaptadorClinico.consultarPaciente(identidad),
+            this.adaptadorPolicia.consultarPaciente(identidad)
         ]);
 
         const clinico = clinicoRes.status === 'fulfilled'
             ? clinicoRes.value
             : { error: clinicoRes.reason?.message || 'Fallo consulta clínica' };
 
-        let policia;
-        if (policiaRes.status === 'fulfilled') {
-            // policiaRes.value = { antecedentes: [...] }
-            policia = this.#derivarFraudeDesdeAntecedentes(policiaRes.value?.antecedentes);
-        } else {
-            policia = { error: policiaRes.reason?.message || 'Fallo consulta policía' };
-        }
+        const policia = policiaRes.status === 'fulfilled'
+            ? this.#fraudeDesdeAntecedentes(policiaRes.value?.antecedentes)
+            : { error: policiaRes.reason?.message || 'Fallo consulta policía' };
 
         return { clinico, policia };
     }

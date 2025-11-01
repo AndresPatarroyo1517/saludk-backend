@@ -1,17 +1,12 @@
 import db from "../models/index.js";
 import logger from "../utils/logger.js";
 import SolicitudRepository from "../repositories/solicitudRepository.js";
-
 import { EstadoSolicitudHandler } from "../domain/estado/estadoHandler.js";
 
 /**
- * Revisión automática (HU-04) usando SolicitudRepository + State + Facade.
- * - Cambia estado: PENDIENTE → APROBADA/RECHAZADA según fraude policial.
- * - Persiste resultados en resultados_bd_externas (JSONB) con Sequelize (sin queries crudas).
- * - Registra una fila en resultado_validacion.
- *
- * @param {string} solicitudId
- * @param {{ fachada: { consultarBases(pacienteId:string): Promise<any> }, userId?: string }} ctx
+ * HU-04: revisión automática
+ * - Si alguna consulta externa falla => permanece PENDIENTE y se guardan SOLO errores
+ * - Si éxito => APROBADA o RECHAZADA y se guarda SOLO resultado (sin duplicar)
  */
 export const revisarSolicitudAutomaticamente = async (solicitudId, { fachada, userId } = {}) => {
     if (!fachada || typeof fachada.consultarBases !== "function") {
@@ -23,7 +18,7 @@ export const revisarSolicitudAutomaticamente = async (solicitudId, { fachada, us
     const { SolicitudRegistro, ResultadoValidacion, sequelize } = db;
     const repository = new SolicitudRepository();
 
-    // 1) Leer solicitud vía repository (tu convención)
+    // 1) Obtener solicitud (tu repo)
     const solicitudInst = await repository.obtenerSolicitudPorId(solicitudId);
     if (!solicitudInst) {
         const e = new Error("Solicitud no encontrada.");
@@ -36,22 +31,29 @@ export const revisarSolicitudAutomaticamente = async (solicitudId, { fachada, us
         throw e;
     }
 
-    // 2) Repo mínimo para StateHandler (solo ORM Sequelize)
+    const identidad = {
+        numeroIdentificacion: solicitudInst.paciente?.numero_identificacion
+    };
+    if (!identidad.numeroIdentificacion) {
+        const e = new Error("El paciente no tiene numero_identificacion; no se puede consultar bases externas.");
+        e.status = 400;
+        throw e;
+    }
+
+    // 2) Repo para el handler (TODO ORM, sin queries crudas)
     const repoForHandler = {
+        
         actualizarEstado: async (id, nuevoEstado, meta = {}) => {
             return sequelize.transaction(async (t) => {
                 const inst = await SolicitudRegistro.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
                 if (!inst) throw new Error("Solicitud no encontrada para actualización");
 
-                const actual = inst.get("resultados_bd_externas") || {};
-                const merged = { ...actual, ...meta };
-
                 const patch = {
                     estado: nuevoEstado,
-                    resultados_bd_externas: merged,
                     fecha_actualizacion: new Date()
                 };
 
+                // Estados terminales → fechas/revisor
                 if (["APROBADA", "RECHAZADA"].includes(nuevoEstado)) {
                     patch.fecha_validacion = new Date();
                     if (userId) patch.revisado_por = userId;
@@ -66,24 +68,38 @@ export const revisarSolicitudAutomaticamente = async (solicitudId, { fachada, us
             });
         },
 
-        guardarResultadoConsultas: async (id, resultado) => {
+        guardarResultadoExitoso: async (id, resultado) => {
             return sequelize.transaction(async (t) => {
                 const inst = await SolicitudRegistro.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
                 if (!inst) throw new Error("Solicitud no encontrada para guardar resultado");
+                inst.set({
+                    resultados_bd_externas: { resultado },
+                    fecha_actualizacion: new Date()
+                });
+                await inst.save({ transaction: t });
+                return inst.toJSON();
+            });
+        },
 
-                const actual = inst.get("resultados_bd_externas") || {};
-                const merged = { ...actual, consultas: resultado };
-
-                inst.set({ resultados_bd_externas: merged, fecha_actualizacion: new Date() });
+        
+        guardarErroresExternos: async (id, errores) => {
+            return sequelize.transaction(async (t) => {
+                const inst = await SolicitudRegistro.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
+                if (!inst) throw new Error("Solicitud no encontrada para guardar errores");
+                inst.set({
+                    resultados_bd_externas: { errores },
+                    fecha_actualizacion: new Date()
+                });
                 await inst.save({ transaction: t });
                 return inst.toJSON();
             });
         }
     };
 
-    // 3) Ejecutar lógica de estados con Facade (decide APROBADA/RECHAZADA)
+    // 3) Ejecutar máquina de estados con Facade
     const handler = new EstadoSolicitudHandler({
-        solicitud: solicitudInst.toJSON(), // POJO
+        solicitud: solicitudInst.toJSON(),
+        identidad,
         repo: repoForHandler,
         fachada
     });
@@ -91,7 +107,18 @@ export const revisarSolicitudAutomaticamente = async (solicitudId, { fachada, us
     try {
         const salida = await handler.revisar();
 
-        // 4) Registrar resultado en resultado_validacion (consolidado)
+        // Caso A) Alguna base falló → estado PENDIENTE con errores
+        if (salida.estado === "PENDIENTE" && salida.errores) {
+            await repoForHandler.guardarErroresExternos(solicitudInst.id, salida.errores);
+
+            logger?.info?.(`Solicitud ${solicitudInst.id}: consultas externas fallidas (permite revisión manual).`);
+            return {
+                estado: "PENDIENTE",
+                errores: salida.errores
+            };
+        }
+
+        // Caso B) Éxito → APROBADA/RECHAZADA
         const hayFraude = !!salida?.resultado?.policia?.tieneFraude;
         await ResultadoValidacion.create({
             solicitud_id: solicitudInst.id,
@@ -105,19 +132,18 @@ export const revisarSolicitudAutomaticamente = async (solicitudId, { fachada, us
             logger?.warn?.(`No se pudo registrar resultado_validacion: ${err.message}`);
         });
 
-        // 5) Guardar consolidado para el Director Médico
-        await repoForHandler.guardarResultadoConsultas(solicitudInst.id, salida);
+        await repoForHandler.guardarResultadoExitoso(solicitudInst.id, salida.resultado);
 
-        logger?.info?.(`Solicitud ${solicitudInst.id} revisada automáticamente -> ${salida.estado}`);
+        logger?.info?.(`Solicitud ${solicitudInst.id} revisada -> ${salida.estado}`);
         return salida;
 
     } catch (err) {
-        // HU-04: si falla, mantener PENDIENTE y permitir manual
-        await repoForHandler.guardarResultadoConsultas(solicitudInst.id, { error: err.message });
+        // Falla no controlada → mantener PENDIENTE y guardar error
+        await repoForHandler.guardarErroresExternos(solicitudInst.id, { general: err.message });
         logger?.error?.(`Fallo revisión automática de solicitud ${solicitudInst.id}: ${err.message}`);
 
         return {
-            estado: solicitudInst.estado, // PENDIENTE
+            estado: "PENDIENTE",
             error: "Fallo la consulta automática. Puede intentar manualmente.",
             detalle: err.message
         };

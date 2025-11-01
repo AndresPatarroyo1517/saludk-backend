@@ -14,8 +14,9 @@ const mapEstados = {
  */
 export class EstadoSolicitudHandler {
 
-    constructor({ solicitud, repo, fachada }) {
-        this.solicitud = solicitud; // POJO (no instancia Sequelize directa)
+    constructor({ solicitud, identidad, repo, fachada }) {
+        this.solicitud = solicitud;
+        this.identidad = identidad;
         this.repo = repo;
         this.fachada = fachada;
         this.estado = this.#instanciar(solicitud.estado);
@@ -39,6 +40,7 @@ export class EstadoSolicitudHandler {
         }
         return this.estado.revisar({
             solicitud: this.solicitud,
+            identidad: this.identidad,
             fachada: this.fachada,
             handler: this
         });

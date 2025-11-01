@@ -4,22 +4,33 @@ export class EstadoPendiente extends EstadoSolicitud {
     constructor() { super('PENDIENTE'); }
 
     async revisar(contexto) {
-        const { solicitud, fachada, handler } = contexto;
+        const { identidad, fachada, handler } = contexto;
 
-        // 1) Consulta unificada a fuentes externas
-        const resultado = await fachada.consultarBases(solicitud.paciente_id);
+        // 1) Consultar ambas fuentes
+        const resultado = await fachada.consultarBases(identidad);
 
-        // 2) Regla principal: fraude en Policía => RECHAZADA
+        const clinicoError = !!resultado?.clinico?.error;
+        const policiaError = !!resultado?.policia?.error;
+
+        // 2) Si hay cualquier error, NO transicionamos y devolvemos errores
+        if (clinicoError || policiaError) {
+            const errores = {
+                ...(clinicoError ? { clinico: resultado.clinico } : {}),
+                ...(policiaError ? { policia: resultado.policia } : {})
+            };
+            return { estado: 'PENDIENTE', errores };
+        }
+
+        // 3) Sin errores: regla de fraude
         if (resultado?.policia?.tieneFraude === true) {
             await handler.cambiarEstado('RECHAZADA', {
-                motivo: 'Fraude médico detectado',
-                detalles: resultado.policia.registros || []
+                motivo: 'Fraude médico detectado'
             });
             return { estado: 'RECHAZADA', resultado };
         }
 
-        // 3) Caso contrario => APROBADA
-        await handler.cambiarEstado('APROBADA', { resultado });
+        // 4) Sin fraude => APROBADA
+        await handler.cambiarEstado('APROBADA');
         return { estado: 'APROBADA', resultado };
     }
 }

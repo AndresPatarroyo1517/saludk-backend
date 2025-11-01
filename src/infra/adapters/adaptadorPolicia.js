@@ -20,25 +20,22 @@ export class AdaptadorPolicia extends AdaptadorBDExterna {
      * { registros: [...] } o { items: [...] }
      * Se normaliza a { antecedentes: [...] } para cumplir el protocolo.
      */
-    async consultarPaciente(pacienteId) {
-        if (!pacienteId) throw new Error('pacienteId es requerido');
+    async consultarPaciente(identidad) {
+        const doc = identidad?.numeroIdentificacion;
+        if (!doc) throw new Error('Falta numeroIdentificacion para consulta policial');
 
-        const url = `${this.baseUrl}/antecedentes/${encodeURIComponent(pacienteId)}`;
+        const url = `${this.baseUrl}/antecedentes/${encodeURIComponent(doc)}`;
+
         const res = await fetch(url, {
             headers: this.token ? { Authorization: `Bearer ${this.token}` } : undefined
         });
-
-        if (!res.ok) {
-            const text = await res.text().catch(() => '');
-            throw new Error(`Policía ${res.status}: ${text || res.statusText}`);
-        }
+        if (!res.ok) throw new Error(`Policía ${res.status}: ${await res.text().catch(() => '')}`);
 
         const data = await res.json().catch(() => ({}));
         const antecedentes =
             Array.isArray(data.registros) ? data.registros :
-                Array.isArray(data.items) ? data.items :
-                    [];
-
+                Array.isArray(data.items) ? data.items : [];
         return { antecedentes };
     }
+
 }

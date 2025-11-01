@@ -10,6 +10,7 @@ import requestLogger from './middlewares/requestLogger.js';
 import SuscripcionRoutes from './routes/suscripcionRoutes.js';
 import PlanRoutes from './routes/planRoutes.js';
 import registroRoutes from './routes/registroRoutes.js';
+import validacionRoute from './routes/validacionRoutes.js'
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './docs/swagger.js';
 import { createBullBoard } from '@bull-board/api';
@@ -243,6 +244,7 @@ process.on('uncaughtException', (error) => {
 app.use('/suscripcion', SuscripcionRoutes);
 app.use('/planes', PlanRoutes);
 app.use('/registro', registroRoutes);
+app.use('/validacion', validacionRoute);
 
 
 

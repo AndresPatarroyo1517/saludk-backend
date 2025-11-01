@@ -15,22 +15,21 @@ export class AdaptadorBDNN extends AdaptadorBDExterna {
         this.token = token;
     }
 
-    async consultarPaciente(pacienteId) {
-        if (!pacienteId) throw new Error('pacienteId es requerido');
 
-        const url = `${this.baseUrl}/pacientes/${encodeURIComponent(pacienteId)}/antecedentes`;
+    async consultarPaciente(identidad) {
+        const doc = identidad?.numeroIdentificacion;
+        if (!doc) throw new Error('Falta numeroIdentificacion para BDNN');
+
+        const url = `${this.baseUrl}/pacientes/${encodeURIComponent(doc)}/antecedentes`;
+
         const res = await fetch(url, {
             headers: this.token ? { Authorization: `Bearer ${this.token}` } : undefined
         });
-
-        if (!res.ok) {
-            const text = await res.text().catch(() => '');
-            throw new Error(`BDNN ${res.status}: ${text || res.statusText}`);
-        }
+        if (!res.ok) throw new Error(`BDNN ${res.status}: ${await res.text().catch(() => '')}`);
 
         const data = await res.json().catch(() => ({}));
         const items = Array.isArray(data.items) ? data.items : [];
-
         return { antecedentes: items };
     }
+
 }
