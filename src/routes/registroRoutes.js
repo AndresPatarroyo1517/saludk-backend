@@ -1,209 +1,219 @@
 import express from 'express';
-import { 
-  registrarPacienteController, 
-  registrarMedicoController 
-} from '../controllers/registroController.js';
-import { authenticateToken } from '../middlewares/auth.js'; // Middleware de autenticación
+import registroController from '../controllers/registroController.js';
+import { authMiddleware } from '../middlewares/authMiddleware.js';
+import { checkRole } from '../middlewares/rbacMiddleware.js';
+import rateLimiter from '../middlewares/rateLimiter.js';
+import {
+  validate,
+  registroPacienteSchema,
+  registroMedicoSchema,
+  decisionSolicitudSchema
+} from '../validators/registroValidator.js';
 
 const router = express.Router();
 
 /**
  * @swagger
- * tags:
- *   - name: Registro
- *     description: Endpoints para registrar pacientes y médicos
- */
-
-/**
- * @swagger
- * /register/paciente:
+ * /registro/paciente:
  *   post:
- *     summary: Registro de paciente (público - no requiere autenticación)
- *     tags: [Registro]
+ *     summary: Registro de un nuevo paciente
+ *     description: Permite registrar un paciente en el sistema. Esta ruta es pública y no requiere autenticación.
+ *     tags:
+ *       - Registro
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - nombre
+ *               - apellido
+ *               - documento
+ *               - correo
+ *               - telefono
+ *               - clave
  *             properties:
- *               usuario:
- *                 type: object
- *                 properties:
- *                   email:
- *                     type: string
- *                     format: email
- *                   password:
- *                     type: string
- *               paciente:
- *                 type: object
- *                 properties:
- *                   nombres:
- *                     type: string
- *                   apellidos:
- *                     type: string
- *                   numero_identificacion:
- *                     type: string
- *                   tipo_identificacion:
- *                     type: string
- *                   telefono:
- *                     type: string
- *                   tipo_sangre:
- *                     type: string
- *                   alergias:
- *                     type: array
- *                     items:
- *                       type: string
- *                   fecha_nacimiento:
- *                     type: string
- *                     format: date
- *                   genero:
- *                     type: string
+ *               nombre:
+ *                 type: string
+ *                 example: "Carlos"
+ *               apellido:
+ *                 type: string
+ *                 example: "Gómez"
+ *               documento:
+ *                 type: string
+ *                 example: "1020304050"
+ *               correo:
+ *                 type: string
+ *                 example: "carlos.gomez@example.com"
+ *               telefono:
+ *                 type: string
+ *                 example: "+57 3104567890"
+ *               clave:
+ *                 type: string
+ *                 example: "ClaveSegura123!"
  *     responses:
  *       201:
- *         description: Solicitud de registro enviada exitosamente
+ *         description: Paciente registrado exitosamente.
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
+ *                 mensaje:
  *                   type: string
- *                 data:
+ *                   example: "Paciente registrado exitosamente."
+ *                 paciente:
  *                   type: object
  *                   properties:
- *                     solicitud_id:
+ *                     id:
  *                       type: string
- *                     estado:
+ *                       example: "64fcbb23d4f9e91a2f5a1d2c"
+ *                     nombre:
  *                       type: string
- *                     paciente:
- *                       type: object
- *                       properties:
- *                         id:
- *                           type: string
- *                         nombres:
- *                           type: string
- *                         apellidos:
- *                           type: string
- *                         numero_identificacion:
- *                           type: string
- *                     usuario:
- *                       type: object
- *                       properties:
- *                         id:
- *                           type: string
- *                         email:
- *                           type: string
- *                         activo:
- *                           type: boolean
- *                 fecha_solicitud:
- *                   type: string
- *                   format: date-time
+ *                       example: "Carlos Gómez"
+ *                     correo:
+ *                       type: string
+ *                       example: "carlos.gomez@example.com"
  *       400:
- *         description: Datos incompletos o inválidos
+ *         description: Datos inválidos o campos requeridos faltantes.
+ *       429:
+ *         description: Límite de solicitudes excedido (rate limit alcanzado).
  *       500:
- *         description: Error interno del servidor
+ *         description: Error interno del servidor.
  */
-router.post('/paciente', registrarPacienteController);
+
+router.post(
+  '/paciente',
+   rateLimiter.rateLimit.global,
+  validate(registroPacienteSchema),
+  registroController.registrarPaciente
+);
 
 /**
  * @swagger
- * /register/medico:
+ * /registro/medico:
  *   post:
- *     summary: Registro de médico (requiere autenticación como admin)
- *     tags: [Registro]
+ *     summary: Registro de un nuevo médico
+ *     description: >
+ *       Permite registrar un médico en el sistema.  
+ *       Esta ruta es privada y requiere permisos de **ADMIN** o **DIRECTOR_MEDICO**.
+ *     tags:
+ *       - Registro
  *     security:
- *       - bearerAuth: []
+ *       - bearerAuth: []   # Solo si usas autenticación JWT
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - nombre
+ *               - apellido
+ *               - documento
+ *               - correo
+ *               - telefono
+ *               - clave
+ *               - especialidad
  *             properties:
- *               usuario:
- *                 type: object
- *                 properties:
- *                   email:
- *                     type: string
- *                     format: email
- *                   password:
- *                     type: string
- *               medico:
- *                 type: object
- *                 properties:
- *                   nombres:
- *                     type: string
- *                   apellidos:
- *                     type: string
- *                   numero_identificacion:
- *                     type: string
- *                   especialidad:
- *                     type: string
- *                   registro_medico:
- *                     type: string
- *                   telefono:
- *                     type: string
- *                   costo_consulta_presencial:
- *                     type: number
- *                     format: float
- *                   costo_consulta_virtual:
- *                     type: number
- *                     format: float
- *                   localidad:
- *                     type: string
- *                   disponible:
- *                     type: boolean
+ *               nombre:
+ *                 type: string
+ *                 example: "Laura"
+ *               apellido:
+ *                 type: string
+ *                 example: "Martínez"
+ *               documento:
+ *                 type: string
+ *                 example: "9988776655"
+ *               correo:
+ *                 type: string
+ *                 example: "laura.martinez@clinic.com"
+ *               telefono:
+ *                 type: string
+ *                 example: "+57 3209876543"
+ *               clave:
+ *                 type: string
+ *                 example: "Doctor123!"
+ *               especialidad:
+ *                 type: string
+ *                 example: "Cardiología"
  *     responses:
  *       201:
- *         description: Médico registrado exitosamente
+ *         description: Médico registrado exitosamente.
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
+ *                 mensaje:
  *                   type: string
- *                 data:
+ *                   example: "Médico registrado exitosamente."
+ *                 medico:
  *                   type: object
  *                   properties:
- *                     usuario:
- *                       type: object
- *                       properties:
- *                         id:
- *                           type: string
- *                         email:
- *                           type: string
- *                         rol:
- *                           type: string
- *                         activo:
- *                           type: boolean
- *                     medico:
- *                       type: object
- *                       properties:
- *                         id:
- *                           type: string
- *                         nombres:
- *                           type: string
- *                         apellidos:
- *                           type: string
- *                         especialidad:
- *                           type: string
- *                         registro_medico:
- *                           type: string
+ *                     id:
+ *                       type: string
+ *                       example: "64fcbb23d4f9e91a2f5a1d2d"
+ *                     nombre:
+ *                       type: string
+ *                       example: "Laura Martínez"
+ *                     especialidad:
+ *                       type: string
+ *                       example: "Cardiología"
  *       400:
- *         description: Datos incompletos o inválidos
+ *         description: Datos inválidos o campos requeridos faltantes.
  *       401:
- *         description: No autorizado (requiere autenticación como admin)
+ *         description: No autorizado. Se requiere token JWT válido.
+ *       403:
+ *         description: Permisos insuficientes (solo ADMIN o DIRECTOR_MEDICO pueden registrar médicos).
  *       500:
- *         description: Error interno del servidor
+ *         description: Error interno del servidor.
  */
-router.post('/medico', authenticateToken, registrarMedicoController);
+
+router.post(
+  '/medico',
+  authMiddleware,
+  checkRole('ADMIN', 'DIRECTOR_MEDICO'),
+  validate(registroMedicoSchema),
+  registroController.registrarMedico
+);
+
+/**
+ * @route   GET /api/v1/solicitudes
+ * @desc    Listar solicitudes de registro (HU-02)
+ * @access  Private (DIRECTOR_MEDICO)
+ */
+router.get(
+  '/solicitudes',
+  authMiddleware,
+  checkRole('DIRECTOR_MEDICO'),
+  registroController.listarSolicitudes
+);
+
+/**
+ * @route   PATCH /api/v1/solicitudes/:id/aprobar
+ * @desc    Aprobar solicitud (HU-03)
+ * @access  Private (DIRECTOR_MEDICO)
+ */
+router.patch(
+  '/solicitudes/:id/aprobar',
+  authMiddleware,
+  checkRole('DIRECTOR_MEDICO'),
+  registroController.aprobarSolicitud
+);
+
+/**
+ * @route   PATCH /api/v1/solicitudes/:id/rechazar
+ * @desc    Rechazar solicitud (HU-03)
+ * @access  Private (DIRECTOR_MEDICO)
+ */
+router.patch(
+  '/solicitudes/:id/rechazar',
+  authMiddleware,
+  checkRole('DIRECTOR_MEDICO'),
+  validate(decisionSolicitudSchema),
+  registroController.rechazarSolicitud
+);
 
 export default router;

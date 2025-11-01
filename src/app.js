@@ -12,6 +12,7 @@ import PlanRoutes from './routes/planRoutes.js';
 import registroRoutes from './routes/registroRoutes.js';
 import ProductosRoutes from './routes/productosRoutes.js';
 import validacionRoute from './routes/validacionRoutes.js'
+import loginRoutes from './routes/loginRoutes.js'
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './docs/swagger.js';
 import { createBullBoard } from '@bull-board/api';
@@ -249,6 +250,7 @@ app.use('/registro', registroRoutes);
 app.use('/productos', ProductosRoutes);
 app.use('/validacion', validacionRoute);
 app.use('/pagos', pagoRutas);
+app.use('/login', loginRoutes);
 
 
 
