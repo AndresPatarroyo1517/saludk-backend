@@ -69,7 +69,7 @@
     "redis": "^5.8.3",
     "redlock": "^5.0.0-beta.2",
     "sequelize": "^6.37.7",
-    "stripe": "^19.1.0",
+    "stripe": "^19.2.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "twilio": "^5.10.3",

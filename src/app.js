@@ -17,6 +17,7 @@ import swaggerSpec from './docs/swagger.js';
 import { createBullBoard } from '@bull-board/api';
 import { BullAdapter } from '@bull-board/api/bullAdapter';
 import { ExpressAdapter } from '@bull-board/express';
+import pagoRutas from './routes/pagoRutas.js';
 
 const app = express();
 
@@ -247,6 +248,7 @@ app.use('/planes', PlanRoutes);
 app.use('/registro', registroRoutes);
 app.use('/productos', ProductosRoutes);
 app.use('/validacion', validacionRoute);
+app.use('/pagos', pagoRutas);
 
 
 
