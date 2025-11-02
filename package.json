@@ -43,6 +43,7 @@
     "body-parser": "^2.2.0",
     "bull": "^4.16.5",
     "compression": "^1.8.1",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "crypto-js": "^4.2.0",
     "dayjs": "^1.11.18",

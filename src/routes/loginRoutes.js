@@ -1,5 +1,6 @@
 import express from "express";
 import LoginController from "../controllers/loginController.js";
+import { authMiddleware } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
@@ -7,8 +8,8 @@ const router = express.Router();
  * @swagger
  * /login:
  *   post:
- *     summary: Inicia sesión con las credenciales del usuario.
- *     description: Verifica las credenciales del usuario y devuelve un token JWT u otro tipo de respuesta de autenticación.
+ *     summary: Inicia sesión con credenciales
+ *     description: Autentica usuario y establece cookies HTTP-only con tokens JWT
  *     tags:
  *       - Autenticación
  *     requestBody:
@@ -24,43 +25,79 @@ const router = express.Router();
  *               email:
  *                 type: string
  *                 example: admin@example.com
- *                 description: Correo electrónico del usuario.
  *               password:
  *                 type: string
  *                 example: "123456"
- *                 description: Contraseña del usuario.
+ *               rememberMe:
+ *                 type: boolean
+ *                 example: true
+ *                 description: Extiende sesión a 30 días
  *     responses:
  *       200:
- *         description: Inicio de sesión exitoso.
- *         content:
- *           application/json:
+ *         description: Login exitoso, tokens en cookies
+ *         headers:
+ *           Set-Cookie:
+ *             description: Cookies de autenticación
  *             schema:
- *               type: object
- *               properties:
- *                 token:
- *                   type: string
- *                   example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
- *                 usuario:
- *                   type: object
- *                   properties:
- *                     email:
- *                       type: string
- *                       example: "admin@example.com"
- *                     nombre:
- *                       type: string
- *                       example: "Andrés Muñoz"
- *                     rol:
- *                       type: string
- *                       example: "Administrador"
+ *               type: string
+ *               example: accessToken=xxx; HttpOnly; Secure; SameSite=Strict
  *       400:
- *         description: Faltan campos requeridos o formato inválido.
+ *         description: Campos requeridos faltantes
  *       401:
- *         description: Credenciales incorrectas.
- *       500:
- *         description: Error interno del servidor.
+ *         description: Credenciales incorrectas
+ *       403:
+ *         description: Cuenta inactiva
  */
-
-
 router.post("/", LoginController.login);
+
+/**
+ * @swagger
+ * /login/refresh:
+ *   post:
+ *     summary: Refresca el access token
+ *     description: Genera nuevo access token usando refresh token de cookie
+ *     tags:
+ *       - Autenticación
+ *     responses:
+ *       200:
+ *         description: Token refrescado
+ *       401:
+ *         description: Refresh token inválido o expirado
+ */
+router.post("/refresh", LoginController.refresh);
+
+/**
+ * @swagger
+ * /login/logout:
+ *   post:
+ *     summary: Cierra sesión
+ *     description: Invalida tokens y limpia cookies
+ *     tags:
+ *       - Autenticación
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Sesión cerrada
+ */
+router.post("/logout", authMiddleware, LoginController.logout);
+
+/**
+ * @swagger
+ * /login/me:
+ *   get:
+ *     summary: Obtiene información del usuario autenticado
+ *     description: Retorna información del usuario en req.user
+ *     tags:
+ *       - Autenticación
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Información del usuario
+ *       401:
+ *         description: No autenticado
+ */
+router.get("/me", authMiddleware, LoginController.me);
 
 export default router;

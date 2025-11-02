@@ -76,6 +76,13 @@ export const registroPacienteSchema = Joi.object({
     genero: Joi.string()
       .valid('Masculino', 'Femenino', 'Otro')
       .optional()
+  }).required(),
+  direccion: Joi.object({
+    tipo: Joi.string().required(), // Ej: "RESIDENCIA", "TRABAJO"
+    direccion_completa: Joi.string().required(),
+    ciudad: Joi.string().required(),
+    departamento: Joi.string().required(),
+    es_principal: Joi.boolean().default(true)
   }).required()
 });
 

@@ -3,7 +3,7 @@ import logger from '../utils/logger.js';
 
 class RegistroController {
   /**
-   * POST /api/v1/register/paciente
+   * POST /api/v1/registro/paciente
    * Registrar paciente (público - HU-01)
    */
   async registrarPaciente(req, res) {
@@ -29,6 +29,11 @@ class RegistroController {
             email: resultado.usuario.email,
             activo: resultado.usuario.activo
           },
+          direccion: {
+            id: resultado.direccion.id,
+            ciudad: resultado.direccion.ciudad,
+            departamento: resultado.direccion.departamento
+          },
           fecha_solicitud: resultado.solicitud.fecha_creacion
         }
       });
@@ -44,7 +49,74 @@ class RegistroController {
   }
 
   /**
-   * POST /api/v1/register/medico
+   * POST /api/v1/registro/solicitudes/:id/documentos
+   * Subir documento a una solicitud
+   */
+  async subirDocumento(req, res) {
+    try {
+      const { id: solicitudId } = req.params;
+      const archivo = req.file;
+
+      if (!archivo) {
+        return res.status(400).json({
+          success: false,
+          error: 'No se recibió ningún archivo'
+        });
+      }
+
+      const documento = await registroService.subirDocumentoSolicitud(
+        solicitudId,
+        archivo
+      );
+
+      res.status(201).json({
+        success: true,
+        message: 'Documento subido exitosamente',
+        data: {
+          id: documento.id,
+          nombre: documento.nombre,
+          tipo: documento.tipo_archivo,
+          tamano_bytes: documento.tamano_bytes,
+          estado: documento.estado,
+          fecha_carga: documento.fecha_carga
+        }
+      });
+    } catch (error) {
+      const status = error.status || 500;
+      logger.error(`Error al subir documento: ${error.message}`);
+
+      res.status(status).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * GET /api/v1/registro/solicitudes/:id/documentos
+   * Listar documentos de una solicitud
+   */
+  async listarDocumentos(req, res) {
+    try {
+      const { id: solicitudId } = req.params;
+      const documentos = await registroService.listarDocumentosSolicitud(solicitudId);
+
+      res.json({
+        success: true,
+        data: documentos,
+        total: documentos.length
+      });
+    } catch (error) {
+      logger.error(`Error al listar documentos: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * POST /api/v1/registro/medico
    * Registrar médico (requiere rol ADMIN o DIRECTOR_MEDICO)
    */
   async registrarMedico(req, res) {
@@ -73,7 +145,7 @@ class RegistroController {
   }
 
   /**
-   * GET /api/v1/solicitudes
+   * GET /api/v1/registro/solicitudes
    * Listar solicitudes (HU-02, HU-03)
    */
   async listarSolicitudes(req, res) {
@@ -96,7 +168,7 @@ class RegistroController {
   }
 
   /**
-   * PATCH /api/v1/solicitudes/:id/aprobar
+   * PATCH /api/v1/registro/solicitudes/:id/aprobar
    * Aprobar solicitud (HU-03)
    */
   async aprobarSolicitud(req, res) {
@@ -108,7 +180,7 @@ class RegistroController {
 
       res.json({
         success: true,
-        message: 'Solicitud aprobada exitosamente',
+        message: 'Solicitud aprobada exitosamente. El usuario ya puede acceder a la plataforma.',
         data: resultado
       });
     } catch (error) {
@@ -123,7 +195,7 @@ class RegistroController {
   }
 
   /**
-   * PATCH /api/v1/solicitudes/:id/rechazar
+   * PATCH /api/v1/registro/solicitudes/:id/rechazar
    * Rechazar solicitud (HU-03)
    */
   async rechazarSolicitud(req, res) {
@@ -140,7 +212,7 @@ class RegistroController {
 
       res.json({
         success: true,
-        message: 'Solicitud rechazada',
+        message: 'Solicitud rechazada. El usuario ha sido notificado del motivo.',
         data: resultado
       });
     } catch (error) {

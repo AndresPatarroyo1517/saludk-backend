@@ -1,8 +1,11 @@
 import SolicitudBuilder from "../jobs/solicitudBuilder.js";
 import SolicitudRepository from "../repositories/solicitudRepository.js";
 import { validatePasswordStrength } from "../utils/passwordUtils.js";
+import { subirArchivo } from "./storjService.js";
 import logger from "../utils/logger.js";
 import bcrypt from "bcrypt";
+import crypto from "crypto";
+import fs from "fs";
 
 /**
  * Servicio de Registro con patrón Builder + validaciones
@@ -16,11 +19,16 @@ class RegistroService {
   /**
    * Crear solicitud de registro de paciente (HU-01)
    */
-  async crearSolicitudPaciente({ usuario, paciente }) {
+  async crearSolicitudPaciente({ usuario, paciente, direccion }) {
     try {
       // Validar estructura base con Builder
       const builder = new SolicitudBuilder();
-      builder.setUsuarioData(usuario).setPacienteData(paciente).setTipo("paciente").build();
+      builder
+        .setUsuarioData(usuario)
+        .setPacienteData(paciente)
+        .setDireccionData(direccion)
+        .setTipo("paciente")
+        .build();
 
       // Validar fortaleza de contraseña
       const passwordValidation = validatePasswordStrength(usuario.password);
@@ -36,7 +44,7 @@ class RegistroService {
       // Hashear contraseña
       const { password_hash, salt } = await this.hashPassword(usuario.password);
 
-      // Crear usuario, paciente y solicitud en BD
+      // Crear usuario, paciente, dirección y solicitud en BD
       const resultado = await this.repository.crearUsuarioPacienteYSolicitud({
         usuario: {
           email: usuario.email,
@@ -56,6 +64,13 @@ class RegistroService {
           fecha_nacimiento: paciente.fecha_nacimiento || null,
           genero: paciente.genero || null,
         },
+        direccion: {
+          tipo: direccion.tipo,
+          direccion_completa: direccion.direccion_completa,
+          ciudad: direccion.ciudad,
+          departamento: direccion.departamento,
+          es_principal: direccion.es_principal !== undefined ? direccion.es_principal : true
+        }
       });
 
       logger.info(`Solicitud de paciente creada: ${resultado.solicitud.id}`, {
@@ -65,6 +80,87 @@ class RegistroService {
       return resultado;
     } catch (error) {
       logger.error(`Error en crearSolicitudPaciente: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Subir documento a una solicitud (HU-01)
+   */
+  async subirDocumentoSolicitud(solicitudId, archivo) {
+    try {
+      // 1. Validar que la solicitud existe y está PENDIENTE
+      const solicitud = await this.repository.obtenerSolicitudPorId(solicitudId);
+      
+      if (!solicitud) {
+        const error = new Error('Solicitud no encontrada');
+        error.status = 404;
+        throw error;
+      }
+
+      if (solicitud.estado !== 'PENDIENTE') {
+        const error = new Error(`No se pueden subir documentos a una solicitud ${solicitud.estado}`);
+        error.status = 400;
+        throw error;
+      }
+
+      // 2. Calcular hash SHA-256 del archivo
+      const fileBuffer = fs.readFileSync(archivo.path);
+      const hash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+
+      // 3. Verificar si ya existe un documento con el mismo hash
+      const documentoDuplicado = await this.repository.verificarDocumentoPorHash(hash);
+      if (documentoDuplicado) {
+        // Borrar archivo temporal
+        fs.unlinkSync(archivo.path);
+        
+        const error = new Error('Este documento ya fue subido anteriormente');
+        error.status = 409;
+        throw error;
+      }
+
+      // 4. Subir a Storj
+      const resultadoStorj = await subirArchivo(archivo);
+
+      // 5. Guardar metadata en BD
+      const documento = await this.repository.crearDocumento({
+        solicitud_id: solicitudId,
+        nombre: resultadoStorj.nombre,
+        ruta_storj: resultadoStorj.url,
+        tipo_archivo: resultadoStorj.tipo,
+        tamano_bytes: resultadoStorj.tamano,
+        hash_sha256: hash,
+        estado: 'PENDIENTE'
+      });
+
+      logger.info(`Documento subido: ${documento.id} para solicitud ${solicitudId}`);
+
+      return documento;
+    } catch (error) {
+      logger.error(`Error en subirDocumentoSolicitud: ${error.message}`);
+      
+      // Limpiar archivo temporal si aún existe
+      try {
+        if (archivo && archivo.path && fs.existsSync(archivo.path)) {
+          fs.unlinkSync(archivo.path);
+        }
+      } catch (e) {
+        logger.warn(`No se pudo borrar archivo temporal: ${e.message}`);
+      }
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Listar documentos de una solicitud
+   */
+  async listarDocumentosSolicitud(solicitudId) {
+    try {
+      const documentos = await this.repository.obtenerDocumentosPorSolicitud(solicitudId);
+      return documentos;
+    } catch (error) {
+      logger.error(`Error en listarDocumentosSolicitud: ${error.message}`);
       throw error;
     }
   }
@@ -159,6 +255,14 @@ class RegistroService {
         throw e;
       }
 
+      // Validar que tenga al menos 1 documento
+      const documentos = await this.repository.obtenerDocumentosPorSolicitud(solicitudId);
+      if (documentos.length === 0) {
+        const e = new Error("No se puede aprobar una solicitud sin documentos.");
+        e.status = 400;
+        throw e;
+      }
+
       const resultado = await this.repository.aprobarSolicitudYActivarUsuario({
         solicitudId,
         revisadoPor,
@@ -175,6 +279,7 @@ class RegistroService {
 
   /**
    * Rechazar solicitud (HU-03)
+   * NO SE BORRAN DATOS, solo se marcan como RECHAZADOS
    */
   async rechazarSolicitud(solicitudId, revisadoPor, motivo_decision) {
     try {
@@ -191,7 +296,7 @@ class RegistroService {
         throw e;
       }
 
-      const resultado = await this.repository.rechazarSolicitudYEliminarUsuario({
+      const resultado = await this.repository.rechazarSolicitud({
         solicitudId,
         revisadoPor,
         motivo_decision,

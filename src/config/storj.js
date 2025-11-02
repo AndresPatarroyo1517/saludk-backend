@@ -39,6 +39,7 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 const storjClient = new S3Client(storjConfig);
+const bucketName = process.env.STORJ_BUCKET_NAME;
 
 const testStorjConnection = async () => {
   try {

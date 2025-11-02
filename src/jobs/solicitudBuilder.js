@@ -9,12 +9,15 @@ class SolicitudBuilder {
     this.solicitud = {
       tipo: null,
       usuario: {},
-      perfil: {} // Puede ser paciente o médico
+      perfil: {}, // Puede ser paciente o médico
+      direccion: null // Solo para pacientes
     };
   }
 
   /**
    * Establece y valida los datos del usuario
+   * NOTA: Esta validación solo verifica FORMATO. 
+   * La unicidad de email se valida en RegistroService.verificarDuplicadosPaciente()
    */
   setUsuarioData(usuario) {
     // Validar campos obligatorios
@@ -91,6 +94,26 @@ class SolicitudBuilder {
         e.status = 400;
         throw e;
       }
+
+      // Validar edad mínima (18 años)
+      const hoy = new Date();
+      const edad = hoy.getFullYear() - fecha.getFullYear();
+      const mesActual = hoy.getMonth();
+      const diaActual = hoy.getDate();
+      const mesNacimiento = fecha.getMonth();
+      const diaNacimiento = fecha.getDate();
+      
+      let edadReal = edad;
+      if (mesActual < mesNacimiento || (mesActual === mesNacimiento && diaActual < diaNacimiento)) {
+        edadReal--;
+      }
+
+      const EDAD_MINIMA = 18;
+      if (edadReal < EDAD_MINIMA) {
+        const e = new Error(`Debes tener al menos ${EDAD_MINIMA} años para registrarte.`);
+        e.status = 400;
+        throw e;
+      }
     }
 
     // Procesar alergias (debe ser un array)
@@ -117,6 +140,35 @@ class SolicitudBuilder {
       alergias: alergias,
       fecha_nacimiento: paciente.fecha_nacimiento || null,
       genero: paciente.genero?.trim() || null
+    };
+
+    return this;
+  }
+
+  /**
+   * Establece y valida los datos de dirección (solo para pacientes)
+   */
+  setDireccionData(direccion) {
+    // Validar campos obligatorios
+    if (!direccion.tipo || !direccion.direccion_completa || !direccion.ciudad || !direccion.departamento) {
+      const e = new Error("Los campos tipo, dirección completa, ciudad y departamento son obligatorios.");
+      e.status = 400;
+      throw e;
+    }
+
+    // Validar longitud de dirección
+    if (direccion.direccion_completa.trim().length < 10) {
+      const e = new Error("La dirección debe tener al menos 10 caracteres.");
+      e.status = 400;
+      throw e;
+    }
+
+    this.solicitud.direccion = {
+      tipo: direccion.tipo.trim(),
+      direccion_completa: direccion.direccion_completa.trim(),
+      ciudad: direccion.ciudad.trim(),
+      departamento: direccion.departamento.trim(),
+      es_principal: direccion.es_principal !== undefined ? direccion.es_principal : true
     };
 
     return this;
@@ -210,6 +262,13 @@ class SolicitudBuilder {
       throw e;
     }
 
+    // Validar dirección solo para pacientes
+    if (this.solicitud.tipo === 'paciente' && !this.solicitud.direccion) {
+      const e = new Error("Debe establecer la dirección del paciente.");
+      e.status = 400;
+      throw e;
+    }
+
     return this.solicitud;
   }
 
@@ -220,7 +279,8 @@ class SolicitudBuilder {
     this.solicitud = {
       tipo: null,
       usuario: {},
-      perfil: {}
+      perfil: {},
+      direccion: null
     };
     return this;
   }

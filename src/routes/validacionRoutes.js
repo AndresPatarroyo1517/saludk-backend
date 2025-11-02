@@ -1,6 +1,5 @@
 import express from 'express';
 import { revisar } from '../controllers/validacionController.js';
-import { authenticateToken } from '../middlewares/auth.js';
 
 const router = express.Router();
 
