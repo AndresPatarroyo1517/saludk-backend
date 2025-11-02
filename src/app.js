@@ -11,8 +11,9 @@ import SuscripcionRoutes from './routes/suscripcionRoutes.js';
 import PlanRoutes from './routes/planRoutes.js';
 import registroRoutes from './routes/registroRoutes.js';
 import ProductosRoutes from './routes/productosRoutes.js';
-import validacionRoute from './routes/validacionRoutes.js'
-import loginRoutes from './routes/loginRoutes.js'
+import validacionRoute from './routes/validacionRoutes.js';
+import loginRoutes from './routes/loginRoutes.js';
+import citaRoutes from './routes/citaRoutes.js'; 
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './docs/swagger.js';
 import cookieParser from 'cookie-parser';
@@ -253,6 +254,7 @@ app.use('/planes', PlanRoutes);
 app.use('/registro', registroRoutes);
 app.use('/productos', ProductosRoutes);
 app.use('/validacion', validacionRoute);
+app.use('/cita', citaRoutes);
 app.use('/pagos', pagoRutas);
 app.use('/login', loginRoutes);
 
