@@ -38,8 +38,19 @@ Usuario.hasMany(SolicitudRegistro, { foreignKey: 'revisado_por', as: 'solicitude
 SolicitudRegistro.belongsTo(Usuario, { foreignKey: 'revisado_por', as: 'revisador' });
 
 // SolicitudRegistro - ResultadoValidacion (1—N)
-SolicitudRegistro.hasMany(ResultadoValidacion, { foreignKey: 'solicitud_id', as: 'validaciones' });
-ResultadoValidacion.belongsTo(SolicitudRegistro, { foreignKey: 'solicitud_id', as: 'solicitud' });
+
+SolicitudRegistro.hasMany(ResultadoValidacion, {
+  foreignKey: 'solicitud_id',
+  as: 'validaciones',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE'
+});
+ResultadoValidacion.belongsTo(SolicitudRegistro, {
+  foreignKey: 'solicitud_id',
+  as: 'solicitud',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE'
+});
 
 // Suscripciones, planes y ordenes de pago
 Paciente.hasMany(Suscripcion, { foreignKey: 'paciente_id' });

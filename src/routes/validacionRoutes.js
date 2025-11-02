@@ -1,5 +1,5 @@
 import express from 'express';
-import { revisar } from '../controllers/validacionController.js';
+import { revisar, listarAprobadas, listarPendientesConErrores, aprobarDirector, devolverDirector, rechazarDirector } from '../controllers/validacionController.js';
 import { authenticateToken } from '../middlewares/auth.js';
 
 const router = express.Router();
@@ -121,4 +121,109 @@ const router = express.Router();
  */
 router.post('/solicitudes/:id/revisar', revisar);
 
+/**
+ * @openapi
+ * /validacion/solicitudes/aprobadas:
+ *   get:
+ *     summary: Listar solicitudes APROBADAS (Director Médico)
+ *     tags: [Validacion]
+ *     security: [ { bearerAuth: [] } ]
+ *     responses:
+ *       '200':
+ *         description: Lista de solicitudes aprobadas con datos de paciente y validaciones
+ */
+router.get('/solicitudes/aprobadas', listarAprobadas); //Poner authToken
+
+/**
+ * @openapi
+ * /validacion/solicitudes/pendientes-con-errores:
+ *   get:
+ *     summary: Listar solicitudes PENDIENTES pero solo si tienen errores en resultados_bd_externas
+ *     tags: [Validacion]
+ *     security: [ { bearerAuth: [] } ]
+ *     responses:
+ *       '200':
+ *         description: Lista de solicitudes pendientes con errores
+ */
+router.get('/solicitudes/pendientes-con-errores', listarPendientesConErrores); //Poner authToken
+
+/**
+ * @openapi
+ * /validacion/solicitudes/{id}/aprobar:
+ *   post:
+ *     summary: Aprobar por Director (crea resultado_validacion y activa usuario)
+ *     tags: [Validacion]
+ *     security: [ { bearerAuth: [] } ]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               motivo_decision: { type: string }
+ *     responses:
+ *       '200':
+ *         description: Solicitud aprobada y usuario activado
+ */
+router.post('/solicitudes/:id/aprobar', aprobarDirector); //Poner authToken
+
+/**
+ * @openapi
+ * /validacion/solicitudes/{id}/rechazar:
+ *   post:
+ *     summary: Rechazar por Director (motivo obligatorio; crea resultado_validacion y elimina usuario/paciente/solicitud)
+ *     tags: [Validacion]
+ *     security: [ { bearerAuth: [] } ]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [motivo_decision]
+ *             properties:
+ *               motivo_decision: { type: string }
+ *     responses:
+ *       '200':
+ *         description: Solicitud rechazada y entidades eliminadas
+ */
+router.post('/solicitudes/:id/rechazar', rechazarDirector); //Poner authToken
+
+/**
+ * @openapi
+ * /validacion/solicitudes/{id}/devolver:
+ *   post:
+ *     summary: Devolver al solicitante (motivo obligatorio; deja la solicitud en PENDIENTE y actualiza fechas)
+ *     tags: [Validacion]
+ *     security: [ { bearerAuth: [] } ]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [motivo_decision]
+ *             properties:
+ *               motivo_decision: { type: string }
+ *     responses:
+ *       '200':
+ *         description: Solicitud devuelta (estado PENDIENTE)
+ */
+router.post('/solicitudes/:id/devolver',  devolverDirector) //Poner authToken
 export default router;

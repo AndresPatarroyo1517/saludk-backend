@@ -24,7 +24,7 @@ export class EstadoPendiente extends EstadoSolicitud {
         // 3) Sin errores: regla de fraude
         if (resultado?.policia?.tieneFraude === true) {
             await handler.cambiarEstado('RECHAZADA', {
-                motivo: 'Fraude médico detectado'
+                motivo: 'Fraude detectado'
             });
             return { estado: 'RECHAZADA', resultado };
         }
