@@ -155,7 +155,7 @@ export const revisarSolicitudAutomaticamente = async (solicitudId, { fachada, us
 export const listarSolicitudesAprobadasDirector = async () => {
     const estado = 'APROBADA';
     const repo = new SolicitudRepository();
-    return await repo.listarSolicitudes({estado});
+    return await repo.listarSolicitudes({ estado });
 };
 
 /** Listar pendientes solo con errores para Director */
@@ -164,20 +164,38 @@ export const listarSolicitudesPendientesConErroresDirector = async () => {
     return await repo.listarSolicitudesPendientesConErrores();
 };
 
-/** Aprobar (Director): crea RV y activa usuario vía repo */
-export const aprobarPorDirector = async ({ solicitudId, revisadoPor, motivo_decision }) => {
+async function validarSolicitudModificable(solicitudId) {
+
     const repo = new SolicitudRepository();
-    console.log(revisadoPor);
-    
-    //  1) Verificar existencia previa
     const solicitud = await repo.obtenerSolicitudPorId(solicitudId);
-    if (!solicitud) {
-        const e = new Error('Solicitud no encontrada');
-        e.status = 404; throw e;
+
+    console.log('Estado:', solicitud.estado);
+    console.log('resultados_bd_externas:', solicitud.resultados_bd_externas);
+
+    if (!solicitud) { const e = new Error('Solicitud no encontrada'); e.status = 404; throw e; }
+
+    if (solicitud.estado === 'RECHAZADA') {
+        throw new Error('No se puede modificar una solicitud RECHAZADA');
     }
 
-    // (Opcional) valida estado si quieres restringir
-    // if (solicitud.estado !== 'APROBADA') { const e=new Error(`Estado no permitido: ${solicitud.estado}`); e.status=409; throw e; }
+
+    if (solicitud.estado === 'PENDIENTE') {
+        const errores = solicitud.resultados_bd_externas?.errores;
+        const tieneErrores = errores && typeof errores === 'object' && Object.keys(errores).length > 0;
+
+        if (!tieneErrores) {
+            const e = new Error('No se puede modificar una solicitud PENDIENTE sin errores en resultados_bd_externas');
+            e.status = 409;
+            throw e;
+        }
+    }
+}
+
+/** Aprobar (Director): crea RV y activa usuario vía repo */
+export const aprobarPorDirector = async ({ solicitudId, revisadoPor, motivo_decision }) => {
+
+    await validarSolicitudModificable(solicitudId);
+    const repo = new SolicitudRepository();
 
     let rv;
     try {
@@ -217,9 +235,8 @@ export const rechazarPorDirector = async ({ solicitudId, revisadoPor, motivo_dec
         e.status = 400; throw e;
     }
 
+    await validarSolicitudModificable(solicitudId);
     const repo = new SolicitudRepository();
-    const solicitud = await repo.obtenerSolicitudPorId(solicitudId);
-    if (!solicitud) { const e = new Error('Solicitud no encontrada'); e.status = 404; throw e; }
 
     let rv;
     try {
@@ -256,9 +273,8 @@ export const devolverPorDirector = async ({ solicitudId, revisadoPor, motivo_dec
         e.status = 400; throw e;
     }
 
+    await validarSolicitudModificable(solicitudId);
     const repo = new SolicitudRepository();
-    const solicitud = await repo.obtenerSolicitudPorId(solicitudId);
-    if (!solicitud) { const e = new Error('Solicitud no encontrada'); e.status = 404; throw e; }
 
     let rv;
     try {
