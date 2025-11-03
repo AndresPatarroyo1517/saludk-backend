@@ -1,4 +1,8 @@
-import { revisarSolicitudAutomaticamente } from "../services/validacionService.js";
+import {
+    revisarSolicitudAutomaticamente, listarSolicitudesAprobadasDirector,
+    listarSolicitudesPendientesConErroresDirector, aprobarPorDirector,
+    rechazarPorDirector, devolverPorDirector
+} from "../services/validacionService.js";
 import { FacadeBasesExternas } from "../infra/fachada/fachadaBasesExternas.js";
 import { AdaptadorBDNN } from "../infra/adapters/adaptadorBDNN.js";
 import { AdaptadorPolicia } from "../infra/adapters/adaptadorPolicia.js";
@@ -36,4 +40,57 @@ export const revisar = async (req, res, next) => {
     } catch (err) {
         next(err);
     }
+};
+
+
+export const listarAprobadas = async (_req, res, next) => {
+    try {
+        const data = await listarSolicitudesAprobadasDirector();
+        res.status(200).json(data);
+    } catch (err) { next(err); }
+};
+
+export const listarPendientesConErrores = async (_req, res, next) => {
+    try {
+        const data = await listarSolicitudesPendientesConErroresDirector();
+        res.status(200).json(data);
+    } catch (err) { next(err); }
+};
+
+export const aprobarDirector = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const motivo_decision = req.body?.motivo_decision;      // 3) libre y opcional
+        const revisadoPor = req.user?.id ?? null;
+        const result = await aprobarPorDirector({ solicitudId: id, revisadoPor, motivo_decision });
+        res.status(200).json(result);
+    } catch (err) { next(err); }
+};
+
+export const rechazarDirector = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { motivo_decision } = req.body || {};
+        if (!motivo_decision) {
+            const e = new Error('El motivo es obligatorio para RECHAZAR');
+            e.status = 400; throw e;
+        }
+        const revisadoPor = req.user?.id ?? null;
+        const result = await rechazarPorDirector({ solicitudId: id, revisadoPor, motivo_decision });
+        res.status(200).json(result);
+    } catch (err) { next(err); }
+};
+
+export const devolverDirector = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { motivo_decision } = req.body || {};
+        if (!motivo_decision) {
+            const e = new Error('El motivo es obligatorio para DEVOLVER');
+            e.status = 400; throw e;
+        }
+        const revisadoPor = req.user?.id ?? null;
+        const result = await devolverPorDirector({ solicitudId: id, revisadoPor, motivo_decision });
+        res.status(200).json(result);
+    } catch (err) { next(err); }
 };

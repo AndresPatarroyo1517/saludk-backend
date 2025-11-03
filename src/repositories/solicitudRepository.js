@@ -1,7 +1,8 @@
 import db from "../models/index.js";
 import logger from "../utils/logger.js";
+import { Op } from "sequelize";
 
-const { Usuario, Paciente, Medico, SolicitudRegistro, Direccion, sequelize } = db;
+const { Usuario, Paciente, Medico, SolicitudRegistro, ResultadoValidacion, Direccion, sequelize } = db;
 
 class SolicitudRepository {
 
@@ -111,7 +112,7 @@ class SolicitudRepository {
     }
   }
 
-  async listarSolicitudes({ estado = 'PENDIENTE' }) {
+  async listarSolicitudes({ estado }) {
     return await SolicitudRegistro.findAll({
       where: { estado },
       include: [
@@ -129,6 +130,27 @@ class SolicitudRepository {
           as: 'revisador',
           attributes: ['id', 'email', 'rol']
         }
+      ],
+      order: [['fecha_creacion', 'DESC']]
+    });
+  }
+
+  async listarSolicitudesPendientesConErrores() {
+    // PENDIENTE y resultados_bd_externas.errores != null
+    return await SolicitudRegistro.findAll({
+      where: {
+        estado: 'PENDIENTE',
+        resultados_bd_externas: {
+          [Op.contains]: {errores: {}}
+        }
+      },
+      include: [
+        {
+          model: Paciente,
+          as: 'paciente',
+          include: [{ model: Usuario, as: 'usuario', attributes: ['id', 'email', 'rol', 'activo'] }]
+        },
+        { model: ResultadoValidacion, as: 'validaciones' }
       ],
       order: [['fecha_creacion', 'DESC']]
     });
@@ -245,6 +267,165 @@ class SolicitudRepository {
       throw error;
     }
   }
+
+  // QUITAR DEL REGISTRO LOS METODOS DE ARRIBA AHORA SE ACTIVA O ELIMINA DESDE LA VALIDACIÓN QUE HACE EL DIRECTOR
+  // ==========================================================
+  // APROBAR / RECHAZAR / DEVOLVER usando resultado_validacion 
+  // ==========================================================
+  async aprobarSolicitudYActivarUsuarioPorResultadoValidacion({ resultadoValidacionId, revisadoPor, motivo_decision }) {
+    const t = await sequelize.transaction();
+    try {
+      const rv = await ResultadoValidacion.findByPk(resultadoValidacionId, {
+        include: [{
+          model: SolicitudRegistro, as: 'solicitud',
+          include: [{ model: Paciente, as: 'paciente', include: [{ model: Usuario, as: 'usuario' }] }]
+        }],
+        transaction: t
+      });
+      if (!rv) throw new Error('resultado_validacion no encontrado');
+      if (rv.resultado !== true) throw new Error('El resultado_validacion no es aprobatorio');
+
+      const solicitud = rv.solicitud;
+      if (!solicitud) throw new Error('Solicitud asociada no encontrada');
+
+      await solicitud.update({
+        estado: 'APROBADA', // aseguramos estado APROBADA si no lo estaba
+        revisado_por: revisadoPor ?? solicitud.revisado_por,
+        motivo_decision: motivo_decision || 'Aprobada por Director Médico',
+        fecha_validacion: new Date(), //  actualiza la fecha
+        fecha_actualizacion: new Date()
+      }, { transaction: t });
+
+      await Usuario.update(
+        { activo: true, fecha_actualizacion: new Date() },
+        { where: { id: solicitud.paciente.usuario_id }, transaction: t }
+      );
+
+      await t.commit();
+      logger.info({ msg: 'Solicitud aprobada por resultado_validacion', resultadoValidacionId, solicitudId: solicitud.id });
+      return { solicitud, usuario_activado: true };
+    } catch (error) {
+      await t.rollback();
+      logger.error({ msg: 'Error al aprobar por resultado_validacion', error: error.message });
+      throw error;
+    }
+  }
+
+   async rechazarSolicitudYEliminarUsuarioPorResultadoValidacion({ resultadoValidacionId, revisadoPor, motivo_decision }) {
+    if (!motivo_decision) {
+      const e = new Error('El motivo es obligatorio para RECHAZAR');
+      e.status = 400;
+      throw e;
+    }
+
+    const t = await sequelize.transaction();
+    try {
+      const rv = await ResultadoValidacion.findByPk(resultadoValidacionId, {
+        include: [{
+          model: SolicitudRegistro,
+          as: 'solicitud',
+          include: [{
+            model: Paciente,
+            as: 'paciente',
+            include: [{ model: Usuario, as: 'usuario' }]
+          }]
+        }],
+        transaction: t
+      });
+
+      if (!rv) throw new Error('resultado_validacion no encontrado');
+      if (rv.resultado !== false) throw new Error('El resultado_validacion no es de rechazo');
+
+      const solicitud = rv.solicitud;
+      if (!solicitud) throw new Error('Solicitud asociada no encontrada');
+
+      // 1. Marcar solicitud como RECHAZADA (NO borrar, mantener para auditoría)
+      await solicitud.update({
+        estado: 'RECHAZADA',
+        revisado_por: revisadoPor ?? solicitud.revisado_por,
+        motivo_decision,
+        fecha_validacion: new Date(),
+        fecha_actualizacion: new Date()
+      }, { transaction: t });
+
+      // 2. Desactivar usuario (NO eliminar, mantener para trazabilidad)
+      await Usuario.update(
+        {
+          activo: false,
+          fecha_actualizacion: new Date()
+        },
+        {
+          where: { id: solicitud.paciente.usuario_id },
+          transaction: t
+        }
+      );
+
+      // 3. Marcar documentos como RECHAZADOS (NO borrar)
+      await Documento.update(
+        { estado: 'RECHAZADO' },
+        {
+          where: { solicitud_id: solicitud.id },
+          transaction: t
+        }
+      );
+
+      await t.commit();
+      logger.info({
+        msg: 'Solicitud rechazada y usuario desactivado por resultado_validacion',
+        resultadoValidacionId,
+        solicitudId: solicitud.id
+      });
+
+      return {
+        solicitud,
+        usuario_desactivado: true,
+        mensaje: 'Solicitud rechazada. Los datos se conservan para auditoría.'
+      };
+    } catch (error) {
+      await t.rollback();
+      logger.error({
+        msg: 'Error al rechazar por resultado_validacion',
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  async devolverSolicitudPorResultadoValidacion({ resultadoValidacionId, revisadoPor, motivo_decision }) {
+    if (!motivo_decision) {
+      const e = new Error('El motivo es obligatorio para DEVOLVER');
+      e.status = 400; throw e;
+    }
+    const t = await sequelize.transaction();
+    try {
+      const rv = await ResultadoValidacion.findByPk(resultadoValidacionId, {
+        include: [{ model: SolicitudRegistro, as: 'solicitud' }],
+        transaction: t
+      });
+      if (!rv) throw new Error('resultado_validacion no encontrado');
+
+      const solicitud = rv.solicitud;
+      if (!solicitud) throw new Error('Solicitud asociada no encontrada');
+
+      // DEVOLVER: se deja en PENDIENTE con motivo y se ACTUALIZA la fecha
+      await solicitud.update({
+        estado: 'PENDIENTE',
+        revisado_por: revisadoPor ?? solicitud.revisado_por,
+        motivo_decision,
+        fecha_validacion: new Date(), // actualiza la fecha (tu petición)
+        fecha_actualizacion: new Date()
+      }, { transaction: t });
+
+      await t.commit();
+      logger.info({ msg: 'Solicitud devuelta por resultado_validacion', resultadoValidacionId, solicitudId: solicitud.id });
+      return { solicitud };
+    } catch (error) {
+      await t.rollback();
+      logger.error({ msg: 'Error al devolver por resultado_validacion', error: error.message });
+      throw error;
+    }
+  }
+
   async verificarDocumentoPorHash(hash) {
     const documento = await Documento.findOne({
       where: { hash_sha256: hash }

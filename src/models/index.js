@@ -171,11 +171,14 @@ Documento.belongsTo(Paciente, {
 SolicitudRegistro.hasMany(ResultadoValidacion, {
   foreignKey: 'solicitud_id',
   as: 'validaciones',
-  onDelete: 'CASCADE'
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE',
 });
 ResultadoValidacion.belongsTo(SolicitudRegistro, {
   foreignKey: 'solicitud_id',
-  as: 'solicitud'
+  as: 'solicitud',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE',
 });
 
 // Usuario (validador) - ResultadoValidacion
