@@ -1,6 +1,6 @@
 import express from 'express';
 import { revisar, listarAprobadas, listarPendientesConErrores, aprobarDirector, devolverDirector, rechazarDirector } from '../controllers/validacionController.js';
-import { authenticateToken } from '../middlewares/auth.js';
+import authMiddleware from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
