@@ -1,27 +1,228 @@
-// src/middlewares/authMiddleware.js
-// Middleware de autenticación (ESM)
+import jwt from 'jsonwebtoken';
+import logger from '../utils/logger.js';
+
+const jwtConfig = {
+  accessTokenSecret: process.env.JWT_ACCESS_SECRET,
+  refreshTokenSecret: process.env.JWT_REFRESH_SECRET,
+  accessTokenExpiry: '15m',
+  refreshTokenExpiry: '7d',
+  rememberMeExpiry: '30d',
+};
+
+/**
+ * Genera Access Token
+ */
+export const generateAccessToken = (payload) => {
+  return jwt.sign(
+    {
+      userId: payload.userId,
+      email: payload.email,
+      rol: payload.rol,
+      type: 'access'
+    },
+    jwtConfig.accessTokenSecret,
+    { expiresIn: jwtConfig.accessTokenExpiry }
+  );
+};
+
+/**
+ * Genera Refresh Token
+ */
+export const generateRefreshToken = (payload, rememberMe = false) => {
+  return jwt.sign(
+    {
+      userId: payload.userId,
+      email: payload.email,
+      type: 'refresh'
+    },
+    jwtConfig.refreshTokenSecret,
+    { 
+      expiresIn: rememberMe ? jwtConfig.rememberMeExpiry : jwtConfig.refreshTokenExpiry 
+    }
+  );
+};
+
+/**
+ * Verifica Access Token
+ */
+export const verifyAccessToken = (token) => {
+  try {
+    return jwt.verify(token, jwtConfig.accessTokenSecret);
+  } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      throw new Error('Token expirado');
+    }
+    throw new Error('Token inválido');
+  }
+};
+
+/**
+ * Verifica Refresh Token
+ */
+export const verifyRefreshToken = (token) => {
+  try {
+    return jwt.verify(token, jwtConfig.refreshTokenSecret);
+  } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      throw new Error('Refresh token expirado');
+    }
+    throw new Error('Refresh token inválido');
+  }
+};
+
+/**
+ * Configura cookies de autenticación
+ */
+export const setAuthCookies = (res, accessToken, refreshToken, rememberMe = false) => {
+  const accessTokenMaxAge = 15 * 60 * 1000; // 15 minutos
+  const refreshTokenMaxAge = rememberMe 
+    ? 30 * 24 * 60 * 60 * 1000  // 30 días
+    : 7 * 24 * 60 * 60 * 1000;   // 7 días
+
+  res.cookie('accessToken', accessToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: accessTokenMaxAge
+  });
+
+  res.cookie('refreshToken', refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: refreshTokenMaxAge
+  });
+};
+
+/**
+ * Limpia cookies de autenticación
+ */
+export const clearAuthCookies = (res) => {
+  res.clearCookie('accessToken');
+  res.clearCookie('refreshToken');
+};
+
+/**
+ * Middleware de autenticación
+ */
 export const authMiddleware = (req, res, next) => {
   try {
-    // En un caso real validarías un token o sesión
-    // Aquí simulamos que el paciente fue aprobado a través del header
-    const pacienteId = req.headers['x-paciente-id']; // Lo envías desde Postman
-
-    if (!pacienteId) {
-      // En desarrollo permitimos un ID simulado para facilitar pruebas desde Swagger UI
-      if (process.env.NODE_ENV === 'development') {
-        const devId = process.env.DEV_PACIENTE_ID || 'dev-paciente-id';
-        req.pacienteId = devId;
-        console.warn('authMiddleware: usando pacienteId de desarrollo ->', devId);
-        return next();
+    // Intentar obtener token de cookie primero, luego de header
+    let token = req.cookies?.accessToken;
+    
+    if (!token) {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith('Bearer ')) {
+        token = authHeader.split(' ')[1];
       }
-
-      return res.status(401).json({ message: 'Paciente no autenticado.' });
     }
 
-    req.pacienteId = pacienteId;
-    return next();
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        error: 'Token no proporcionado'
+      });
+    }
+
+    const decoded = verifyAccessToken(token);
+
+    req.user = {
+      userId: decoded.userId,
+      email: decoded.email,
+      rol: decoded.rol
+    };
+
+    req.app.locals.currentUserId = decoded.userId;
+    next();
+
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: 'Error en autenticación.' });
+    logger.security('AUTHENTICATION_FAILED', {
+      error: error.message,
+      ip: req.ip
+    });
+
+    if (error.message === 'Token expirado') {
+      return res.status(401).json({
+        success: false,
+        error: 'Token expirado',
+        code: 'TOKEN_EXPIRED'
+      });
+    }
+
+    res.status(401).json({
+      success: false,
+      error: 'Token inválido'
+    });
   }
+};
+
+/**
+ * Middleware para verificar roles
+ */
+export const checkRole = (...allowedRoles) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        error: 'No autenticado'
+      });
+    }
+
+    if (!allowedRoles.includes(req.user.rol)) {
+      logger.security('UNAUTHORIZED_ACCESS', {
+        userId: req.user.userId,
+        userRole: req.user.rol,
+        requiredRoles: allowedRoles,
+        attemptedResource: req.path,
+        ip: req.ip
+      });
+
+      return res.status(403).json({
+        success: false,
+        error: 'No tiene permisos para acceder a este recurso'
+      });
+    }
+
+    next();
+  };
+};
+
+/**
+ * Middleware de autenticación opcional
+ */
+export const optionalAuth = (req, res, next) => {
+  try {
+    let token = req.cookies?.accessToken;
+    
+    if (!token) {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith('Bearer ')) {
+        token = authHeader.split(' ')[1];
+      }
+    }
+
+    if (token) {
+      const decoded = verifyAccessToken(token);
+      req.user = {
+        userId: decoded.userId,
+        email: decoded.email,
+        rol: decoded.rol
+      };
+    }
+  } catch (error) {
+    // Ignorar errores en auth opcional
+  }
+  next();
+};
+
+export default {
+  generateAccessToken,
+  generateRefreshToken,
+  verifyAccessToken,
+  verifyRefreshToken,
+  setAuthCookies,
+  clearAuthCookies,
+  authMiddleware,
+  checkRole,
+  optionalAuth
 };

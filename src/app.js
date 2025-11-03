@@ -11,12 +11,16 @@ import SuscripcionRoutes from './routes/suscripcionRoutes.js';
 import PlanRoutes from './routes/planRoutes.js';
 import registroRoutes from './routes/registroRoutes.js';
 import ProductosRoutes from './routes/productosRoutes.js';
-import validacionRoute from './routes/validacionRoutes.js'
+import validacionRoute from './routes/validacionRoutes.js';
+import loginRoutes from './routes/loginRoutes.js';
+import citaRoutes from './routes/citaRoutes.js'; 
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './docs/swagger.js';
+import cookieParser from 'cookie-parser';
 import { createBullBoard } from '@bull-board/api';
 import { BullAdapter } from '@bull-board/api/bullAdapter';
 import { ExpressAdapter } from '@bull-board/express';
+import pagoRutas from './routes/pagoRutas.js';
 
 const app = express();
 
@@ -66,6 +70,7 @@ app.use(hpp());
 app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(cookieParser());
 
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
@@ -148,6 +153,8 @@ if (process.env.NODE_ENV === 'development') {
   } catch (error) {
     logger.warn('Bull Board not initialized:', error.message);
   }
+}else{
+  limpiezaDocumentosJob.iniciar();
 }
 
 //app.use('/api/v1', routes);
@@ -247,6 +254,9 @@ app.use('/planes', PlanRoutes);
 app.use('/registro', registroRoutes);
 app.use('/productos', ProductosRoutes);
 app.use('/validacion', validacionRoute);
+app.use('/cita', citaRoutes);
+app.use('/pagos', pagoRutas);
+app.use('/login', loginRoutes);
 
 
 

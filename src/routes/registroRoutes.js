@@ -1,209 +1,115 @@
 import express from 'express';
-import { 
-  registrarPacienteController, 
-  registrarMedicoController 
-} from '../controllers/registroController.js';
-import { authenticateToken } from '../middlewares/auth.js'; // Middleware de autenticación
+import multer from 'multer';
+import registroController from '../controllers/registroController.js';
+import { authMiddleware } from '../middlewares/authMiddleware.js';
+import rateLimiter from '../middlewares/rateLimiter.js';
+import {
+  validate,
+  registroPacienteSchema,
+  registroMedicoSchema,
+  decisionSolicitudSchema
+} from '../validators/registroValidator.js';
 
 const router = express.Router();
 
-/**
- * @swagger
- * tags:
- *   - name: Registro
- *     description: Endpoints para registrar pacientes y médicos
- */
+// Configurar multer para archivos temporales
+const upload = multer({ 
+  dest: 'uploads/temp/',
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+  fileFilter: (req, file, cb) => {
+    const allowedMimes = [
+      'application/pdf',
+      'image/jpeg',
+      'image/jpg',
+      'image/png'
+    ];
+    
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Tipo de archivo no permitido. Solo PDF, JPG, PNG'));
+    }
+  }
+});
 
 /**
- * @swagger
- * /register/paciente:
- *   post:
- *     summary: Registro de paciente (público - no requiere autenticación)
- *     tags: [Registro]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               usuario:
- *                 type: object
- *                 properties:
- *                   email:
- *                     type: string
- *                     format: email
- *                   password:
- *                     type: string
- *               paciente:
- *                 type: object
- *                 properties:
- *                   nombres:
- *                     type: string
- *                   apellidos:
- *                     type: string
- *                   numero_identificacion:
- *                     type: string
- *                   tipo_identificacion:
- *                     type: string
- *                   telefono:
- *                     type: string
- *                   tipo_sangre:
- *                     type: string
- *                   alergias:
- *                     type: array
- *                     items:
- *                       type: string
- *                   fecha_nacimiento:
- *                     type: string
- *                     format: date
- *                   genero:
- *                     type: string
- *     responses:
- *       201:
- *         description: Solicitud de registro enviada exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                 data:
- *                   type: object
- *                   properties:
- *                     solicitud_id:
- *                       type: string
- *                     estado:
- *                       type: string
- *                     paciente:
- *                       type: object
- *                       properties:
- *                         id:
- *                           type: string
- *                         nombres:
- *                           type: string
- *                         apellidos:
- *                           type: string
- *                         numero_identificacion:
- *                           type: string
- *                     usuario:
- *                       type: object
- *                       properties:
- *                         id:
- *                           type: string
- *                         email:
- *                           type: string
- *                         activo:
- *                           type: boolean
- *                 fecha_solicitud:
- *                   type: string
- *                   format: date-time
- *       400:
- *         description: Datos incompletos o inválidos
- *       500:
- *         description: Error interno del servidor
+ * @route   POST /api/v1/registro/paciente
+ * @desc    Registro de un nuevo paciente
+ * @access  Public
  */
-router.post('/paciente', registrarPacienteController);
+router.post(
+  '/paciente',
+  rateLimiter.rateLimit.global,
+  validate(registroPacienteSchema),
+  registroController.registrarPaciente
+);
 
 /**
- * @swagger
- * /register/medico:
- *   post:
- *     summary: Registro de médico (requiere autenticación como admin)
- *     tags: [Registro]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               usuario:
- *                 type: object
- *                 properties:
- *                   email:
- *                     type: string
- *                     format: email
- *                   password:
- *                     type: string
- *               medico:
- *                 type: object
- *                 properties:
- *                   nombres:
- *                     type: string
- *                   apellidos:
- *                     type: string
- *                   numero_identificacion:
- *                     type: string
- *                   especialidad:
- *                     type: string
- *                   registro_medico:
- *                     type: string
- *                   telefono:
- *                     type: string
- *                   costo_consulta_presencial:
- *                     type: number
- *                     format: float
- *                   costo_consulta_virtual:
- *                     type: number
- *                     format: float
- *                   localidad:
- *                     type: string
- *                   disponible:
- *                     type: boolean
- *     responses:
- *       201:
- *         description: Médico registrado exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                 data:
- *                   type: object
- *                   properties:
- *                     usuario:
- *                       type: object
- *                       properties:
- *                         id:
- *                           type: string
- *                         email:
- *                           type: string
- *                         rol:
- *                           type: string
- *                         activo:
- *                           type: boolean
- *                     medico:
- *                       type: object
- *                       properties:
- *                         id:
- *                           type: string
- *                         nombres:
- *                           type: string
- *                         apellidos:
- *                           type: string
- *                         especialidad:
- *                           type: string
- *                         registro_medico:
- *                           type: string
- *       400:
- *         description: Datos incompletos o inválidos
- *       401:
- *         description: No autorizado (requiere autenticación como admin)
- *       500:
- *         description: Error interno del servidor
+ * @route   POST /api/v1/registro/solicitudes/:id/documentos
+ * @desc    Subir documento a una solicitud PENDIENTE
+ * @access  Public (el usuario que creó la solicitud)
  */
-router.post('/medico', authenticateToken, registrarMedicoController);
+router.post(
+  '/solicitudes/:id/documentos',
+  rateLimiter.rateLimit.upload || rateLimiter.rateLimit.global,
+  upload.single('documento'), // Campo 'documento' en FormData
+  registroController.subirDocumento
+);
+
+/**
+ * @route   GET /api/v1/registro/solicitudes/:id/documentos
+ * @desc    Listar documentos de una solicitud
+ * @access  Private (DIRECTOR_MEDICO) o Public (dueño de la solicitud)
+ */
+router.get(
+  '/solicitudes/:id/documentos',
+  registroController.listarDocumentos
+);
+
+/**
+ * @route   POST /api/v1/registro/medico
+ * @desc    Registro de un nuevo médico
+ * @access  Private (ADMIN o DIRECTOR_MEDICO)
+ */
+router.post(
+  '/medico',
+  authMiddleware,
+  validate(registroMedicoSchema),
+  registroController.registrarMedico
+);
+
+/**
+ * @route   GET /api/v1/registro/solicitudes
+ * @desc    Listar solicitudes de registro (HU-02)
+ * @access  Private (DIRECTOR_MEDICO)
+ */
+router.get(
+  '/solicitudes',
+  authMiddleware,
+  registroController.listarSolicitudes
+);
+
+/**
+ * @route   PATCH /api/v1/registro/solicitudes/:id/aprobar
+ * @desc    Aprobar solicitud (HU-03)
+ * @access  Private (DIRECTOR_MEDICO)
+ */
+router.patch(
+  '/solicitudes/:id/aprobar',
+  authMiddleware,
+  registroController.aprobarSolicitud
+);
+
+/**
+ * @route   PATCH /api/v1/registro/solicitudes/:id/rechazar
+ * @desc    Rechazar solicitud (HU-03)
+ * @access  Private (DIRECTOR_MEDICO)
+ */
+router.patch(
+  '/solicitudes/:id/rechazar',
+  authMiddleware,
+  validate(decisionSolicitudSchema),
+  registroController.rechazarSolicitud
+);
 
 export default router;

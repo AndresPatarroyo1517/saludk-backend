@@ -1,5 +1,6 @@
 import productoRepository from '../repositories/productoRepository.js';
 import proveedorAdapter from '../jobs/proveedorAdapter.js';
+import PaymentService from './pagoService.js'; // ⚡ NUEVO: Integrar sistema de pagos
 import db from '../models/index.js';
 import logger from '../utils/logger.js';
 import { sequelize } from '../database/database.js';
@@ -7,7 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { QueryTypes } from 'sequelize';
 
 /**
- * ProductosService
+ * ProductosService - Ahora integrado con sistema de pagos
  */
 
 const consultarCatalogo = async (options = {}) => {
@@ -25,10 +26,13 @@ const consultarCatalogo = async (options = {}) => {
   }));
 };
 
-const procesarCompra = async (pacienteId, items = []) => {
-  // items: [{ productId, cantidad }]
+/**
+ * Procesa una compra de productos
+ * AHORA: Crea la compra + genera orden de pago automáticamente
+ */
+const procesarCompra = async (pacienteId, items = [], metodoPago = 'TARJETA') => {
   try {
-    // 1) verificar suscripción activa
+    // 1) Verificar suscripción activa
     const today = new Date().toISOString().slice(0,10);
     const suscripcion = await db.Suscripcion.findOne({
       where: {
@@ -48,14 +52,14 @@ const procesarCompra = async (pacienteId, items = []) => {
       throw e;
     }
 
-    // 2) verificar disponibilidad
+    // 2) Verificar disponibilidad
     const ids = items.map(i => i.productId);
     const disponibilidadMap = await proveedorAdapter.consultarDisponibilidad(ids);
 
     const unavailable = [];
     let total = 0;
 
-    // get product details to calculate price
+    // Obtener detalles de productos para calcular precio
     const catalog = await productoRepository.findAll({});
     const catalogMap = Object.fromEntries(catalog.map(p => [p.id, p]));
 
@@ -76,13 +80,13 @@ const procesarCompra = async (pacienteId, items = []) => {
       throw e;
     }
 
-    // 3) persistir compra y items dentro de una transacción
+    // 3) Persistir compra y items dentro de una transacción
     const t = await sequelize.transaction();
     try {
       const compraId = uuidv4();
       const numeroOrden = `ORD-${Date.now().toString(36)}-${uuidv4().slice(0, 6)}`;
 
-      const subtotal = total; // no discounts applied yet
+      const subtotal = total;
       const descuento = 0.0;
       const totalFinal = subtotal - descuento;
 
@@ -99,13 +103,13 @@ const procesarCompra = async (pacienteId, items = []) => {
           subtotal,
           descuento,
           total: totalFinal,
-          estado: 'PENDIENTE',
+          estado: 'CARRITO', // ⚡ CAMBIO: Empieza en CARRITO, cambiará a PENDIENTE cuando pague
           tipoEntrega: 'DOMICILIO',
         },
         transaction: t,
       });
 
-      // insertar items y decrementar stock
+      // Insertar items
       for (const it of items) {
         const prod = catalogMap[it.productId];
         const precioUnit = prod?.precio ?? 0;
@@ -131,50 +135,169 @@ const procesarCompra = async (pacienteId, items = []) => {
           transaction: t,
         });
 
+        // ⚡ NUEVO: Ya no decrementamos stock aquí, se hará cuando el pago sea confirmado
+        // Esto evita reservar stock de pagos que nunca se completan
+      }
+
+      await t.commit();
+
+      logger.info(`✅ Compra ${compraId} creada exitosamente. Total: $${totalFinal}`);
+
+      // 4) ⚡ NUEVO: Crear orden de pago automáticamente
+      const resultadoPago = await PaymentService.crearOrdenPago({
+        metodoPago: metodoPago,
+        tipoOrden: 'COMPRA',
+        pacienteId: pacienteId,
+        compraId: compraId,
+        monto: totalFinal,
+        currency: 'cop',
+        metadata: {
+          numero_orden: numeroOrden,
+          cantidad_items: items.length,
+          tipo: 'compra_productos'
+        }
+      });
+
+      logger.info(`✅ Orden de pago creada: ${resultadoPago.orden.id} | Método: ${metodoPago}`);
+
+      // 5) Preparar respuesta completa
+      const resumen = {
+        compra: {
+          id: compraId,
+          numero_orden: numeroOrden,
+          paciente_id: pacienteId,
+          items: items.map(it => ({
+            producto_id: it.productId,
+            cantidad: it.cantidad,
+            precio_unitario: catalogMap[it.productId]?.precio ?? 0,
+            nombre: catalogMap[it.productId]?.nombre ?? 'Producto'
+          })),
+          subtotal,
+          descuento,
+          total: totalFinal,
+          moneda: 'COP',
+          fecha: new Date().toISOString(),
+          estado: 'CARRITO', // Esperando pago
+        },
+        ordenPago: {
+          id: resultadoPago.orden.id,
+          estado: resultadoPago.orden.estado,
+          monto: resultadoPago.orden.monto,
+          metodo_pago: resultadoPago.orden.metodo_pago,
+          referencia: resultadoPago.orden.referencia_transaccion
+        }
+      };
+
+      // Agregar datos específicos según método de pago
+      if (metodoPago === 'TARJETA' && resultadoPago.paymentIntent) {
+        resumen.stripe = {
+          clientSecret: resultadoPago.paymentIntent.client_secret,
+          paymentIntentId: resultadoPago.paymentIntent.id
+        };
+      }
+
+      if (metodoPago === 'PASARELA') {
+        resumen.pse = {
+          referencia: resultadoPago.orden.referencia_transaccion,
+          mensaje: resultadoPago.message
+        };
+      }
+
+      if (metodoPago === 'CONSIGNACION' && resultadoPago.instrucciones) {
+        resumen.consignacion = resultadoPago.instrucciones;
+      }
+
+      return resumen;
+
+    } catch (txErr) {
+      await t.rollback();
+      throw txErr;
+    }
+
+  } catch (error) {
+    logger.error('❌ ProductosService.procesarCompra error: ' + error.message);
+    throw error;
+  }
+};
+
+/**
+ * ⚡ NUEVO: Confirma una compra después de que el pago sea exitoso
+ * Este método se llamará desde el webhook o confirmación de pago
+ */
+const confirmarCompra = async (compraId) => {
+  try {
+    const t = await sequelize.transaction();
+
+    try {
+      // 1. Actualizar estado de compra a PENDIENTE (esperando preparación)
+      const updateCompraSql = `
+        UPDATE public.compra 
+        SET estado = 'PENDIENTE', fecha_pago = now(), fecha_actualizacion = now()
+        WHERE id = :compraId
+      `;
+      await sequelize.query(updateCompraSql, {
+        replacements: { compraId },
+        transaction: t,
+      });
+
+      // 2. Decrementar stock de los productos
+      const getItemsSql = `
+        SELECT producto_id, cantidad 
+        FROM public.compra_producto 
+        WHERE compra_id = :compraId
+      `;
+      const items = await sequelize.query(getItemsSql, {
+        replacements: { compraId },
+        type: QueryTypes.SELECT,
+        transaction: t,
+      });
+
+      for (const item of items) {
         const updateStockSql = `
           UPDATE public.stock
           SET cantidad_disponible = cantidad_disponible - :cantidad
           WHERE producto_id = :productoId AND cantidad_disponible >= :cantidad
         `;
-
         await sequelize.query(updateStockSql, {
-          replacements: { productoId: it.productId, cantidad },
+          replacements: { 
+            productoId: item.producto_id, 
+            cantidad: item.cantidad 
+          },
           transaction: t,
         });
 
-        // verify remaining stock
+        // Verificar stock restante
         const checkSql = `SELECT cantidad_disponible FROM public.stock WHERE producto_id = :productoId`;
-        const rows = await sequelize.query(checkSql, { replacements: { productoId: it.productId }, type: QueryTypes.SELECT, transaction: t });
+        const rows = await sequelize.query(checkSql, { 
+          replacements: { productoId: item.producto_id }, 
+          type: QueryTypes.SELECT, 
+          transaction: t 
+        });
+        
         const remaining = rows && rows[0] ? Number(rows[0].cantidad_disponible || 0) : 0;
         if (remaining < 0) {
-          throw new Error(`Stock inconsistente para producto ${it.productId}`);
+          throw new Error(`Stock inconsistente para producto ${item.producto_id}`);
         }
       }
 
       await t.commit();
+      logger.info(`✅ Compra ${compraId} confirmada y stock actualizado`);
+      
+      return { success: true, compraId };
 
-      const resumen = {
-        compraId,
-        numeroOrden,
-        pacienteId,
-        items: items.map(it => ({ ...it, precio_unitario: catalogMap[it.productId]?.precio ?? 0 })),
-        subtotal,
-        descuento,
-        total: totalFinal,
-        moneda: 'COP',
-        fecha: new Date().toISOString(),
-        estado: 'PENDIENTE',
-      };
-
-      return resumen;
     } catch (txErr) {
       await t.rollback();
       throw txErr;
     }
+
   } catch (error) {
-    logger.error('ProductosService.procesarCompra error: ' + error.message);
+    logger.error(`❌ Error confirmando compra: ${error.message}`);
     throw error;
   }
 };
 
-export default { consultarCatalogo, procesarCompra };
+export default { 
+  consultarCatalogo, 
+  procesarCompra,
+  confirmarCompra 
+};
