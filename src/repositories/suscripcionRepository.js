@@ -1,5 +1,6 @@
 import db from '../models/index.js';
 import { v4 as uuidv4 } from 'uuid';
+import { Op } from 'sequelize';
 import logger from '../utils/logger.js';
 
 const Suscripcion = db.Suscripcion;
@@ -132,6 +133,182 @@ const updateEstado = async (id, nuevoEstado) => {
     throw error;
   }
 };
+
+
+const toDateOnly = (d) => new Date(new Date(d).toISOString().slice(0, 10));
+
+/**
+ * 1) TOTAL de PACIENTES con suscripción ACTIVA (snapshot en asOf).
+ *    Cuenta pacientes únicos (distinct por paciente_id).
+ */
+export const countPacientesActivosSnapshot = async (
+  asOf,
+  opts = { activeStates: ['ACTIVA', 'PAGADA'] }
+) => {
+  try {
+    const asOfDate = toDateOnly(asOf ?? new Date());
+    const activeStates = opts?.activeStates ?? ['ACTIVA', 'PAGADA'];
+
+    const total = await Suscripcion.count({
+      distinct: true,
+      col: 'paciente_id',
+      where: {
+        estado: { [Op.in]: activeStates },
+        fecha_inicio: { [Op.lte]: asOfDate },
+        fecha_vencimiento: { [Op.gte]: asOfDate }
+      }
+    });
+
+    return total;
+  } catch (error) {
+    logger.error(`❌ Error en countPacientesActivosSnapshot: ${error.message}`);
+    throw error;
+  }
+};
+
+/**
+ * 2) DESGLOSE por categoría usando LISTAS de plan_id (más rápido y claro).
+ *    Devuelve { sub_premium, sub_estandar, totalActivos }
+ */
+export const countActivosByPlanIdsSnapshot = async (
+  asOf,
+  opts = {
+    activeStates: ['ACTIVA', 'PAGADA'],
+    premiumPlanIds: [],
+    estandarPlanIds: []
+  }
+) => {
+  try {
+    const asOfDate = toDateOnly(asOf ?? new Date());
+    const activeStates = opts?.activeStates ?? ['ACTIVA', 'PAGADA'];
+    const { premiumPlanIds = [], estandarPlanIds = [] } = opts;
+
+    // Conteos por categoría (distinct pacientes)
+    const [premium, estandar, totalActivos] = await Promise.all([
+      premiumPlanIds.length
+        ? Suscripcion.count({
+          distinct: true,
+          col: 'paciente_id',
+          where: {
+            estado: { [Op.in]: activeStates },
+            plan_id: { [Op.in]: premiumPlanIds },
+            fecha_inicio: { [Op.lte]: asOfDate },
+            fecha_vencimiento: { [Op.gte]: asOfDate }
+          }
+        })
+        : 0,
+      estandarPlanIds.length
+        ? Suscripcion.count({
+          distinct: true,
+          col: 'paciente_id',
+          where: {
+            estado: { [Op.in]: activeStates },
+            plan_id: { [Op.in]: estandarPlanIds },
+            fecha_inicio: { [Op.lte]: asOfDate },
+            fecha_vencimiento: { [Op.gte]: asOfDate }
+          }
+        })
+        : 0,
+      // Total (por si quieres comparativo)
+      Suscripcion.count({
+        distinct: true,
+        col: 'paciente_id',
+        where: {
+          estado: { [Op.in]: activeStates },
+          fecha_inicio: { [Op.lte]: asOfDate },
+          fecha_vencimiento: { [Op.gte]: asOfDate }
+        }
+      })
+    ]);
+
+    return {
+      sub_premium: premium,
+      sub_estandar: estandar,
+      totalActivos
+    };
+  } catch (error) {
+    logger.error(`❌ Error en countActivosByPlanIdsSnapshot: ${error.message}`);
+    throw error;
+  }
+};
+
+/**
+ * 3) DESGLOSE por categoría usando PATRONES en Plan (JOIN).
+ *    Útil si no tienes mapeo de IDs y quieres basarte en nombre/código.
+ *    opts.premium: { codes?: string[], prefixes?: string[], namePatterns?: string[] }
+ *    opts.estandar: { codes?: string[], prefixes?: string[], namePatterns?: string[] }
+ */
+export const countActivosByPlanPatternsSnapshot = async (
+  asOf,
+  opts = {
+    activeStates: ['ACTIVA', 'PAGADA'],
+    premium: { codes: [], prefixes: [], namePatterns: [] },
+    estandar: { codes: [], prefixes: [], namePatterns: [] }
+  }
+) => {
+  try {
+    const asOfDate = toDateOnly(asOf ?? new Date());
+    const activeStates = opts?.activeStates ?? ['ACTIVA', 'PAGADA'];
+
+    const buildPlanWhere = (rules = {}) => {
+      const or = [];
+      const { codes = [], prefixes = [], namePatterns = [] } = rules;
+      if (codes.length) or.push({ codigo: { [Op.in]: codes } });
+      if (prefixes.length) prefixes.forEach(p => or.push({ codigo: { [Op.iLike]: `${p}%` } }));
+      if (namePatterns.length) namePatterns.forEach(p => or.push({ nombre: { [Op.iLike]: p } }));
+      return or.length ? { [Op.or]: or } : undefined;
+    };
+
+    const commonWhere = {
+      estado: { [Op.in]: activeStates },
+      fecha_inicio: { [Op.lte]: asOfDate },
+      fecha_vencimiento: { [Op.gte]: asOfDate }
+    };
+
+    const [premium, estandar, totalActivos] = await Promise.all([
+      // Premium
+      Suscripcion.count({
+        distinct: true,
+        col: 'paciente_id',
+        where: commonWhere,
+        include: [{
+          model: Plan,
+          as: 'plan',
+          attributes: [],
+          where: buildPlanWhere(opts?.premium)
+        }]
+      }),
+      // Estándar
+      Suscripcion.count({
+        distinct: true,
+        col: 'paciente_id',
+        where: commonWhere,
+        include: [{
+          model: Plan,
+          as: 'plan',
+          attributes: [],
+          where: buildPlanWhere(opts?.estandar)
+        }]
+      }),
+      // Total
+      Suscripcion.count({
+        distinct: true,
+        col: 'paciente_id',
+        where: commonWhere
+      })
+    ]);
+
+    return {
+      sub_premium: premium,
+      sub_estandar: estandar,
+      totalActivos
+    };
+  } catch (error) {
+    logger.error(`❌ Error en countActivosByPlanPatternsSnapshot: ${error.message}`);
+    throw error;
+  }
+};
+
 
 export default { 
   create, 
