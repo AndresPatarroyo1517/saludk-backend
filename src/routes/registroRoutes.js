@@ -311,7 +311,7 @@ const upload = multer({
 
 /**
  * @swagger
- * /api/v1/registro/paciente:
+ * /registro/paciente:
  *   post:
  *     summary: Registrar un nuevo paciente
  *     description: |
