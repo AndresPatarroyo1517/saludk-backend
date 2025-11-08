@@ -499,7 +499,7 @@ router.post(
 
 /**
  * @swagger
- * /api/v1/registro/solicitudes/{id}/documentos:
+ * /registro/solicitudes/{id}/documentos:
  *   post:
  *     summary: Subir documento a una solicitud de registro
  *     description: |
@@ -670,7 +670,7 @@ router.post(
 
 /**
  * @swagger
- * /api/v1/registro/solicitudes/{id}/documentos:
+ * /registro/solicitudes/{id}/documentos:
  *   get:
  *     summary: Listar documentos de una solicitud
  *     description: |
@@ -1027,7 +1027,7 @@ router.post(
 
 /**
  * @swagger
- * /api/v1/registro/solicitudes:
+ * /registro/solicitudes:
  *   get:
  *     summary: Listar solicitudes de registro
  *     description: |
@@ -1233,7 +1233,7 @@ router.get(
 
 /**
  * @swagger
- * /api/v1/registro/solicitudes/{id}/aprobar:
+ * /registro/solicitudes/{id}/aprobar:
  *   patch:
  *     summary: Aprobar solicitud de registro
  *     description: |
@@ -1380,7 +1380,7 @@ router.patch(
 
 /**
  * @swagger
- * /api/v1/registro/solicitudes/{id}/rechazar:
+ * /registro/solicitudes/{id}/rechazar:
  *   patch:
  *     summary: Rechazar solicitud de registro
  *     description: |
