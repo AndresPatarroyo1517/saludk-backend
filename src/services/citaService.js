@@ -3,19 +3,19 @@ import medicoRepository from '../repositories/medicoRepository.js';
 import notificationService from './notificationService.js';
 
 class citaService {
-  async agendarCita({ pacienteId, medicoId, fecha, hora, modalidad }) {
+  async agendarCita({ paciente_id, medico_id, fecha, hora, modalidad }) {
     // Verificar que el médico exista
-    const medico = await medicoRepository.obtenerMedicoPorId(medicoId);
+    const medico = await medicoRepository.obtenerMedicoPorId( medico_id );
     if (!medico) throw new Error('El médico no existe.');
 
     // Verificar disponibilidad
-    const disponible = await citaRepository.verificarDisponibilidad(medicoId, fecha, hora);
+    const disponible = await citaRepository.verificarDisponibilidad( medico_id, fecha, hora);
     if (!disponible) throw new Error('No hay disponibilidad para esa fecha y hora.');
 
     // Crear la cita
     const nueva = await citaRepository.create({
-      pacienteId,
-      medicoId,
+      paciente_id,
+      medico_id,
       fecha,
       hora,
       modalidad,

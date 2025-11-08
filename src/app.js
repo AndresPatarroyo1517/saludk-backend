@@ -51,7 +51,7 @@ const corsOptions = {
 
     const allowedOrigins = process.env.FRONTEND_URL
       ? process.env.FRONTEND_URL.split(',')
-      : ['http://localhost:4200', `http://localhost:${process.env.PORT || 3000}`, `http://127.0.0.1:${process.env.PORT || 3000}`];
+      : ['http://localhost:4000', `http://localhost:${process.env.PORT || 3000}`, `http://127.0.0.1:${process.env.PORT || 3000}`];
 
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);

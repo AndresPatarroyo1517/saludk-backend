@@ -1,9 +1,11 @@
 import db from "../models/index.js";
-const { Medico } = db;
+import logger from "../utils/logger.js";
+const { Cita } = db;
+
 
 const create = async (data, options = {}) => {
   try {
-    const cita = await cita.create(data, options);
+    const cita = await Cita.create(data, options);
     return cita;
   } catch (err) {
     logger.error(`citaRepository.create: ${err.message}`);
@@ -13,7 +15,7 @@ const create = async (data, options = {}) => {
 
 const findById = async (id) => {
   try {
-    return await cita.findByPk(id);
+    return await Cita.findByPk(id);
   } catch (err) {
     logger.error(`CitaRepository.findById: ${err.message}`);
     throw err;
@@ -22,7 +24,7 @@ const findById = async (id) => {
 
 const update = async (id, attrs) => {
   try {
-    const cita = await cita.findByPk(id);
+    const cita = await Cita.findByPk(id);
     if (!cita) return null;
     return await cita.update(attrs);
   } catch (err) {
@@ -33,8 +35,8 @@ const update = async (id, attrs) => {
 
 const verificarDisponibilidad = async (medicoId, fecha, hora) => {
   try {
-    const existente = await cita.findOne({
-      where: { medicoId, fecha, hora, estado: 'PENDIENTE' }
+    const existente = await Cita.findOne({
+      where: { medico_id: medicoId, fecha, hora, estado: 'PENDIENTE' }
     });
     return !existente;
   } catch (err) {

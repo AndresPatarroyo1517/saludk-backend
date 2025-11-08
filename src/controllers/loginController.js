@@ -108,30 +108,76 @@ class LoginController {
    * Me
    */
   async me(req, res) {
-    try {
-      // Aquí authMiddleware ya puso req.user si token es válido
-      if (!req.user) {
-        return res.status(401).json({
-          success: false,
-          message: "No autenticado"
-        });
-      }
-
-      // Retorna la info del usuario en req.user
-      res.status(200).json({
-        success: true,
-        usuario: {
-          userId: req.user.userId,
-          email: req.user.email,
-          rol: req.user.rol
-        }
-      });
-    } catch (error) {
-      res.status(500).json({
+  try {
+    // El middleware de autenticación ya coloca req.user
+    if (!req.user) {
+      return res.status(401).json({
         success: false,
-        message: error.message || "Error al obtener usuario"
+        message: "No autenticado"
       });
     }
+
+    const { userId } = req.user;
+
+    // Busca el usuario y sus datos relacionados
+    const usuario = await Usuario.findByPk(userId, {
+      attributes: ['id', 'email', 'rol'], // solo lo necesario
+      include: [
+        {
+          model: Paciente,
+          as: 'paciente',
+          attributes: [
+            'id',
+            'nombre',
+            'apellido',
+            'fecha_nacimiento',
+            'telefono',
+            'genero',
+            'tipo_documento',
+            'numero_documento'
+          ],
+          include: [
+            {
+              model: Direccion,
+              as: 'direcciones',
+              attributes: [
+                'id',
+                'calle',
+                'ciudad',
+                'departamento',
+                'codigo_postal',
+                'pais'
+              ]
+            }
+          ]
+        }
+      ]
+    });
+
+    if (!usuario) {
+      return res.status(404).json({
+        success: false,
+        message: "Usuario no encontrado"
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      usuario: {
+        id: usuario.id,
+        email: usuario.email,
+        rol: usuario.rol.toLowerCase(),
+        datos_personales: usuario.paciente || null
+      }
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Error al obtener datos del usuario"
+    });
+  }
   }
 }
 
