@@ -1,5 +1,6 @@
 import loginService from "../services/loginService.js";
 import { setAuthCookies, clearAuthCookies } from "../middlewares/authMiddleware.js";
+import { Usuario, Paciente, Direccion } from "../models/index.js";
 
 class LoginController {
   /**
@@ -128,25 +129,23 @@ class LoginController {
           as: 'paciente',
           attributes: [
             'id',
-            'nombre',
-            'apellido',
+            'nombres',
+            'apellidos',
             'fecha_nacimiento',
             'telefono',
             'genero',
-            'tipo_documento',
-            'numero_documento'
+            'tipo_identificacion',
+            'numero_identificacion'
           ],
           include: [
             {
               model: Direccion,
               as: 'direcciones',
               attributes: [
-                'id',
-                'calle',
+                'direccion_completa',
                 'ciudad',
                 'departamento',
-                'codigo_postal',
-                'pais'
+                'tipo'
               ]
             }
           ]
