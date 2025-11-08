@@ -787,7 +787,7 @@ router.get(
 
 /**
  * @swagger
- * /api/v1/registro/medico:
+ * /registro/medico:
  *   post:
  *     summary: Registrar un nuevo médico
  *     description: |
@@ -1019,8 +1019,8 @@ router.get(
  */
 router.post(
   '/medico',
-  authMiddleware,
-  checkRole('ADMIN', 'DIRECTOR_MEDICO'),
+  //authMiddleware,
+  //checkRole('ADMIN', 'DIRECTOR_MEDICO'),
   validate(registroMedicoSchema),
   registroController.registrarMedico
 );
