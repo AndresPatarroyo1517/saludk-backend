@@ -23,6 +23,7 @@ const sequelize = new Sequelize(database, username, password, {
   port: port,
   dialect: 'postgres',
   protocol: 'postgres',
+  underscored: true,
   dialectOptions: {
     ssl: sslEnabled ? {
       require: true,

@@ -34,12 +34,10 @@ const crearSuscripcion = async (pacienteId, planId, metodoPago = 'TARJETA') => {
 
     const monto = Number(plan.precio_mensual);
 
-    logger.info(`📋 Plan: ${plan.nombre} | Precio: ${monto} COP | Método: ${metodoPago}`);
 
     // 2. Crear la suscripción en BD
     const suscripcion = await SuscripcionRepository.create(pacienteId, planId);
 
-    logger.info(`✅ Suscripción ${suscripcion.id} creada. Generando orden de pago...`);
 
     // 3. Crear orden de pago
     const resultadoPago = await PaymentService.crearOrdenPago({
