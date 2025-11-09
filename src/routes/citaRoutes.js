@@ -35,7 +35,7 @@ const router = express.Router();
  *                 example: "0336963c-9912-4dda-92c0-eedd85a06581"
  *               fecha_hora:
  *                 type: string
- *                 example: "2025-11-12T15:00:00Z"
+ *                 example: "2025-11-11T15:00:00Z"
  *               modalidad:
  *                 type: string
  *                 example: "VIRTUAL"
