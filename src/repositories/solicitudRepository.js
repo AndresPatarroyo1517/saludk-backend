@@ -426,24 +426,6 @@ class SolicitudRepository {
     }
   }
 
-  async countByRange(
-    { from, to },
-    opts = { dateField: 'fecha_creacion', estados: undefined, reviewed: undefined }
-  ) {
-    const dateField = opts?.dateField ?? 'fecha_creacion';
-
-    const total = await SolicitudRegistro.count({
-      where: {
-        [dateField]: { [Op.between]: [from, to] },
-        ...(opts?.estados?.length ? { estado: { [Op.in]: opts.estados } } : {}),
-        ...(opts?.reviewed === true ? { revisado_por: { [Op.ne]: null } } : {}),
-        ...(opts?.reviewed === false ? { revisado_por: null } : {})
-      }
-    });
-
-    return total;
-  };
-
   async verificarDocumentoPorHash(hash) {
     const documento = await Documento.findOne({
       where: { hash_sha256: hash }

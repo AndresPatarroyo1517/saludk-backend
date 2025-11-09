@@ -1,17 +1,15 @@
-import KpiService from '../services/KpiService.js';
+import * as kpiService from '../services/kpiService.js';
 
-const obtenerKpis = async (req, res) => {
+export const getKPIs = async (req, res) => {
     try {
-        const { tipo, fecha_inicio, fecha_fin } = req.query;
-        const filtros = { tipo, fecha_inicio, fecha_fin };
-        const kpis = await KpiService.getResumenKpis(filtros);
-        res.json({ filtros, kpis });
+        const kpis = await kpiService.obtenerKPIs(req.query);
+        res.json(kpis);
     } catch (error) {
-        console.error('Error al obtener KPIs:', error);
-        res.status(500).json({ error: 'Error al obtener KPIs', detalle: error.message });
+        console.error(error);
+        res.status(500).json({
+            success: false,
+            message: "Error al obtener KPIs",
+            error: error.message
+        });
     }
-};
-
-export default {
-    obtenerKpis
 };
