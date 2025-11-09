@@ -1,31 +1,13 @@
 import db from "../models/index.js";
-const { Medico } = db;
+const { Medico, Cita } = db;
 
-class MedicoRepository {
-  async crearMedico(data) {
-    return await Medico.create(data);
-  }
 
-  async obtenerMedicos() {
-    return await Medico.findAll();
-  }
-
-  async obtenerMedicoPorId(id) {
-    return await Medico.findByPk(id);
-  }
-
-  async actualizarMedico(id, data) {
-    const medicoEncontrado = await Medico.findByPk(id);
-    if (!medicoEncontrado) return null;
-    return await medicoEncontrado.update(data);
-  }
-
-  async eliminarMedico(id) {
-    const medicoEncontrado = await Medico.findByPk(id);
-    if (!medicoEncontrado) return null;
-    await medicoEncontrado.destroy();
-    return medicoEncontrado;
+class medicoRepository {
+  async validarDisponibilidad(medico_id, fecha_hora) {
+    const citaExistente = await Cita.findOne({ where: { medico_id, fecha_hora } });
+    return !citaExistente; 
   }
 }
 
-export default new MedicoRepository();
+export default new medicoRepository();
+

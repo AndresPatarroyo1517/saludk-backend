@@ -1,11 +1,11 @@
 import nodemailer from 'nodemailer';
 import logger from '../utils/logger.js';
 
-class NotificationService {
+class notificationService {
   constructor() {
-    // Configuración del transportador de correo (puedes moverlo a .env)
+   
     this.transporter = nodemailer.createTransport({
-      service: 'gmail', // o 'smtp-mail.outlook.com', según el caso
+      service: 'gmail', 
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
@@ -31,7 +31,7 @@ class NotificationService {
 
       await this.transporter.sendMail(mailOptions);
 
-      logger.info(`📧 Correo enviado a: ${destinatarios.join(', ')}`);
+      logger.info(`Correo enviado a: ${destinatarios.join(', ')}`);
       return { success: true };
     } catch (err) {
       logger.error(`Error al enviar correo: ${err.message}`);
@@ -40,4 +40,4 @@ class NotificationService {
   }
 }
 
-export default new NotificationService();
+export default new notificationService();

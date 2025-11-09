@@ -1,30 +1,33 @@
-import citaService from '../services/citaService.js';
-import logger from '../utils/logger.js';
+import CitasService from '../services/citaService.js';
 
-
-const agendarCita = async (req, res) => {
-  try {
-    const body = req.body;
-    const pacienteId = req.pacienteId || req.headers['x-paciente-id'] || body.pacienteId;
-    const cita = await citaService.agendarCita({ ...body, pacienteId }); 
-    return res.status(201).json({ success: true, data: cita });
-  } catch (err) {
-    logger.error(`citaController.agendarCita: ${err.message}`);
-    return res.status(err.status || 400).json({ success: false, error: err.message }); 
+class CitasController {
+  async agendarCita(req, res) {
+    try {
+      const { paciente_id, medico_id, fecha_hora, modalidad, motivo_consulta } = req.body;
+      const cita = await CitasService.agendarCita({
+        paciente_id,
+        medico_id,
+        fecha_hora,
+        modalidad,
+        motivo_consulta,
+      });
+      res.status(201).json({ message: 'Cita agendada exitosamente', cita });
+    } catch (error) {
+      console.error('Error al agendar cita: - citaController.js:16', error);
+      res.status(400).json({ message: 'Error al agendar la cita', error: error.message });
+    }
   }
-};
 
-const cancelarCita = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const resu = await citaService.cancelarCita(id); 
-    return res.json({ success: true, data: resu });
-  } catch (err) {
-    return res.status(400).json({ success: false, error: err.message });
+  async cancelarCita(req, res) {
+    try {
+      const { id } = req.params;
+      const result = await CitasService.cancelarCita(id);
+      res.status(200).json(result);
+    } catch (error) {
+      res.status(400).json({ message: 'Error al cancelar la cita', error: error.message });
+    }
   }
-};
+}
 
-export default {
-  agendarCita,
-  cancelarCita
-};
+export default new CitasController();
+
