@@ -33,11 +33,11 @@ class CalificacionService {
     const transaction = await sequelize.transaction();
     
     try {
-      // Crear la calificación
+      // Crear la calificación con snake_case
       const calificacion = await calificacionRepository.crearCalificacionMedico({
-        pacienteId,
-        medicoId,
-        citaId,
+        paciente_id: pacienteId,  // ✅ CORREGIDO
+        medico_id: medicoId,      // ✅ CORREGIDO
+        cita_id: citaId,          // ✅ CORREGIDO
         puntuacion,
         comentario: comentario || null
       });
@@ -92,7 +92,7 @@ class CalificacionService {
     }
 
     // Validación: verificar que el paciente es el dueño de la calificación
-    if (calificacionExistente.pacienteId !== pacienteId) {
+    if (calificacionExistente.paciente_id !== pacienteId) { // ✅ CORREGIDO
       throw new Error('No tienes permiso para modificar esta calificación');
     }
 
@@ -116,7 +116,7 @@ class CalificacionService {
 
       // Si se actualizó la puntuación, recalcular el promedio del médico
       if (puntuacion !== undefined) {
-        await calificacionRepository.actualizarPromedioMedico(calificacionExistente.medicoId);
+        await calificacionRepository.actualizarPromedioMedico(calificacionExistente.medico_id); // ✅ CORREGIDO
       }
 
       await transaction.commit();
@@ -137,14 +137,14 @@ class CalificacionService {
     }
 
     // Validación: verificar que el paciente es el dueño de la calificación
-    if (calificacionExistente.pacienteId !== pacienteId) {
+    if (calificacionExistente.paciente_id !== pacienteId) { // ✅ CORREGIDO
       throw new Error('No tienes permiso para eliminar esta calificación');
     }
 
     const transaction = await sequelize.transaction();
     
     try {
-      const medicoId = calificacionExistente.medicoId;
+      const medicoId = calificacionExistente.medico_id; // ✅ CORREGIDO
       
       await calificacionRepository.eliminarCalificacionMedico(id);
       
@@ -177,9 +177,8 @@ class CalificacionService {
     if (!compraInfo) {
       throw new Error('La compra no existe');
     }
-
     if (!compraInfo.entregada) {
-      throw new Error(`No se puede calificar una compra con estado: ${compraInfo.estado}. La compra debe estar ENTREGADO`);
+      throw new Error(`No se puede calificar una compra con estado: ${compraInfo.estado}. La compra debe estar ENTREGADA`);
     }
 
     // Validación: verificar que el producto está en la compra
@@ -202,11 +201,11 @@ class CalificacionService {
     const transaction = await sequelize.transaction();
     
     try {
-      // Crear la calificación
+      // Crear la calificación con snake_case
       const calificacion = await calificacionRepository.crearCalificacionProducto({
-        pacienteId,
-        productoId,
-        compraId,
+        paciente_id: pacienteId,  // ✅ CORREGIDO
+        producto_id: productoId,  // ✅ CORREGIDO
+        compra_id: compraId,      // ✅ CORREGIDO
         puntuacion,
         comentario: comentario || null
       });
@@ -261,7 +260,7 @@ class CalificacionService {
     }
 
     // Validación: verificar que el paciente es el dueño de la calificación
-    if (calificacionExistente.pacienteId !== pacienteId) {
+    if (calificacionExistente.paciente_id !== pacienteId) { // ✅ CORREGIDO
       throw new Error('No tienes permiso para modificar esta calificación');
     }
 
@@ -285,7 +284,7 @@ class CalificacionService {
 
       // Si se actualizó la puntuación, recalcular el promedio del producto
       if (puntuacion !== undefined) {
-        await calificacionRepository.actualizarPromedioProducto(calificacionExistente.productoId);
+        await calificacionRepository.actualizarPromedioProducto(calificacionExistente.producto_id); // ✅ CORREGIDO
       }
 
       await transaction.commit();
@@ -306,14 +305,14 @@ class CalificacionService {
     }
 
     // Validación: verificar que el paciente es el dueño de la calificación
-    if (calificacionExistente.pacienteId !== pacienteId) {
+    if (calificacionExistente.paciente_id !== pacienteId) { // ✅ CORREGIDO
       throw new Error('No tienes permiso para eliminar esta calificación');
     }
 
     const transaction = await sequelize.transaction();
     
     try {
-      const productoId = calificacionExistente.productoId;
+      const productoId = calificacionExistente.producto_id; // ✅ CORREGIDO
       
       await calificacionRepository.eliminarCalificacionProducto(id);
       
@@ -329,7 +328,6 @@ class CalificacionService {
       throw error;
     }
   }
-
 
   async obtenerCalificacionesPorPaciente(pacienteId, tipo = 'ambos') {
     return await calificacionRepository.obtenerCalificacionesPorPaciente(pacienteId, tipo);

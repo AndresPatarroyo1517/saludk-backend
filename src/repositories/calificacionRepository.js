@@ -6,7 +6,8 @@ import {
   Paciente, 
   Cita, 
   Compra,
-  CompraProducto 
+  CompraProducto,
+  sequelize 
 } from '../models/index.js';
 import { Op } from 'sequelize';
 
@@ -28,19 +29,19 @@ class CalificacionRepository {
         { 
           model: Medico, 
           as: 'medico', 
-          attributes: ['id', 'nombres', 'apellidos', 'especialidad', 'calificacionPromedio'] 
+          attributes: ['id', 'nombres', 'apellidos', 'especialidad', 'calificacion_promedio'] 
         },
         { 
           model: Cita, 
           as: 'cita',
-          attributes: ['id', 'fechaHora', 'modalidad', 'estado']
+          attributes: ['id', 'fecha_hora', 'modalidad', 'estado']
         }
       ]
     });
   }
 
   async obtenerCalificacionesPorMedico(medicoId, filtros = {}) {
-    const where = { medicoId };
+    const where = { medico_id: medicoId };
     
     if (filtros.puntuacionMin) {
       where.puntuacion = { [Op.gte]: filtros.puntuacionMin };
@@ -51,12 +52,12 @@ class CalificacionRepository {
     }
     
     if (filtros.fechaDesde) {
-      where.fechaCreacion = { [Op.gte]: new Date(filtros.fechaDesde) };
+      where.fecha_creacion = { [Op.gte]: new Date(filtros.fechaDesde) };
     }
 
     if (filtros.fechaHasta) {
-      where.fechaCreacion = { 
-        ...where.fechaCreacion, 
+      where.fecha_creacion = { 
+        ...where.fecha_creacion, 
         [Op.lte]: new Date(filtros.fechaHasta) 
       };
     }
@@ -72,10 +73,10 @@ class CalificacionRepository {
         {
           model: Cita,
           as: 'cita',
-          attributes: ['fechaHora', 'modalidad']
+          attributes: ['fecha_hora', 'modalidad']
         }
       ],
-      order: [['fechaCreacion', 'DESC']],
+      order: [['fecha_creacion', 'DESC']],
       limit: filtros.limit || 50,
       offset: filtros.offset || 0
     });
@@ -83,7 +84,7 @@ class CalificacionRepository {
 
   async verificarCalificacionMedicoPorCita(citaId) {
     return await CalificacionMedico.findOne({ 
-      where: { citaId } 
+      where: { cita_id: citaId } 
     });
   }
 
@@ -98,6 +99,7 @@ class CalificacionRepository {
       existe: true,
       completada: cita.estado === 'COMPLETADA',
       estado: cita.estado,
+      fechaHora: cita.fecha_hora
     };
   }
 
@@ -116,7 +118,7 @@ class CalificacionRepository {
 
   async calcularEstadisticasMedico(medicoId) {
     const [stats] = await CalificacionMedico.findAll({
-      where: { medicoId },
+      where: { medico_id: medicoId },
       attributes: [
         [sequelize.fn('AVG', sequelize.col('puntuacion')), 'promedio'],
         [sequelize.fn('COUNT', sequelize.col('id')), 'total'],
@@ -128,7 +130,7 @@ class CalificacionRepository {
     
     // Distribución por puntuación
     const distribucion = await CalificacionMedico.findAll({
-      where: { medicoId },
+      where: { medico_id: medicoId },
       attributes: [
         'puntuacion',
         [sequelize.fn('COUNT', sequelize.col('id')), 'cantidad']
@@ -152,7 +154,7 @@ class CalificacionRepository {
     
     await Medico.update(
       { 
-        calificacionPromedio: stats.promedio
+        calificacion_promedio: stats.promedio
       },
       { where: { id: medicoId } }
     );
@@ -177,19 +179,19 @@ class CalificacionRepository {
         { 
           model: ProductoFarmaceutico, 
           as: 'producto', 
-          attributes: ['id', 'nombre', 'marca', 'calificacionPromedio'] 
+          attributes: ['id', 'nombre', 'marca', 'calificacion_promedio'] 
         },
         { 
           model: Compra, 
           as: 'compra',
-          attributes: ['id', 'numeroOrden', 'estado', 'fechaEntrega']
+          attributes: ['id', 'numero_orden', 'estado', 'fecha_entrega']
         }
       ]
     });
   }
 
   async obtenerCalificacionesPorProducto(productoId, filtros = {}) {
-    const where = { productoId };
+    const where = { producto_id: productoId }; // ✅ CORREGIDO
     
     if (filtros.puntuacionMin) {
       where.puntuacion = { [Op.gte]: filtros.puntuacionMin };
@@ -200,12 +202,12 @@ class CalificacionRepository {
     }
     
     if (filtros.fechaDesde) {
-      where.fechaCreacion = { [Op.gte]: new Date(filtros.fechaDesde) };
+      where.fecha_creacion = { [Op.gte]: new Date(filtros.fechaDesde) };
     }
 
     if (filtros.fechaHasta) {
-      where.fechaCreacion = { 
-        ...where.fechaCreacion, 
+      where.fecha_creacion = { 
+        ...where.fecha_creacion, 
         [Op.lte]: new Date(filtros.fechaHasta) 
       };
     }
@@ -221,10 +223,10 @@ class CalificacionRepository {
         {
           model: Compra,
           as: 'compra',
-          attributes: ['numeroOrden', 'fechaEntrega']
+          attributes: ['numero_orden', 'fecha_entrega']
         }
       ],
-      order: [['fechaCreacion', 'DESC']],
+      order: [['fecha_creacion', 'DESC']],
       limit: filtros.limit || 50,
       offset: filtros.offset || 0
     });
@@ -233,8 +235,8 @@ class CalificacionRepository {
   async verificarCalificacionProductoPorCompra(compraId, productoId) {
     return await CalificacionProducto.findOne({ 
       where: { 
-        compraId,
-        productoId 
+        compra_id: compraId,      // ✅ CORREGIDO
+        producto_id: productoId   // ✅ CORREGIDO
       } 
     });
   }
@@ -242,8 +244,8 @@ class CalificacionRepository {
   async verificarProductoEnCompra(compraId, productoId) {
     const compraProducto = await CompraProducto.findOne({
       where: {
-        compraId,
-        productoId
+        compra_id: compraId,
+        producto_id: productoId
       }
     });
     
@@ -252,16 +254,16 @@ class CalificacionRepository {
 
   async verificarCompraEntregada(compraId) {
     const compra = await Compra.findByPk(compraId, {
-      attributes: ['id', 'estado', 'fechaEntrega']
+      attributes: ['id', 'estado', 'fecha_entrega']
     });
     
     if (!compra) return null;
     
     return {
       existe: true,
-      entregada: compra.estado === 'ENTREGADO',
+      entregada: compra.estado === 'ENTREGADA',  // ✅ CORREGIDO
       estado: compra.estado,
-      fechaEntrega: compra.fechaEntrega
+      fechaEntrega: compra.fecha_entrega
     };
   }
 
@@ -280,7 +282,7 @@ class CalificacionRepository {
 
   async calcularEstadisticasProducto(productoId) {
     const [stats] = await CalificacionProducto.findAll({
-      where: { productoId },
+      where: { producto_id: productoId }, // ✅ CORREGIDO
       attributes: [
         [sequelize.fn('AVG', sequelize.col('puntuacion')), 'promedio'],
         [sequelize.fn('COUNT', sequelize.col('id')), 'total'],
@@ -292,7 +294,7 @@ class CalificacionRepository {
     
     // Distribución por puntuación
     const distribucion = await CalificacionProducto.findAll({
-      where: { productoId },
+      where: { producto_id: productoId }, // ✅ CORREGIDO
       attributes: [
         'puntuacion',
         [sequelize.fn('COUNT', sequelize.col('id')), 'cantidad']
@@ -316,8 +318,8 @@ class CalificacionRepository {
     
     await ProductoFarmaceutico.update(
       { 
-        calificacionPromedio: stats.promedio,
-        cantidadCalificaciones: stats.total
+        calificacion_promedio: stats.promedio,
+        cantidad_calificaciones: stats.total
       },
       { where: { id: productoId } }
     );
@@ -332,23 +334,23 @@ class CalificacionRepository {
     
     if (tipo === 'medicos' || tipo === 'ambos') {
       result.medicos = await CalificacionMedico.findAll({
-        where: { pacienteId },
+        where: { paciente_id: pacienteId }, 
         include: [
           { model: Medico, as: 'medico', attributes: ['id', 'nombres', 'apellidos'] },
-          { model: Cita, as: 'cita', attributes: ['fechaHora', 'modalidad'] }
+          { model: Cita, as: 'cita', attributes: ['fecha_hora', 'modalidad'] }
         ],
-        order: [['fechaCreacion', 'DESC']]
+        order: [['fecha_creacion', 'DESC']]
       });
     }
     
     if (tipo === 'productos' || tipo === 'ambos') {
       result.productos = await CalificacionProducto.findAll({
-        where: { pacienteId },
+        where: { paciente_id: pacienteId }, 
         include: [
           { model: ProductoFarmaceutico, as: 'producto', attributes: ['id', 'nombre', 'marca'] },
-          { model: Compra, as: 'compra', attributes: ['numeroOrden', 'fechaEntrega'] }
+          { model: Compra, as: 'compra', attributes: ['numero_orden', 'fecha_entrega'] }
         ],
-        order: [['fechaCreacion', 'DESC']]
+        order: [['fecha_creacion', 'DESC']]
       });
     }
     
