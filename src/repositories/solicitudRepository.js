@@ -52,11 +52,11 @@ class SolicitudRepository {
       }, { transaction: t });
 
       const direccionCreada = await Direccion.create({
-      paciente_id: pacienteCreado.id,
-      ...direccion,
-      fecha_creacion: new Date()
-    }, { transaction: t });
-      
+        paciente_id: pacienteCreado.id,
+        ...direccion,
+        fecha_creacion: new Date()
+      }, { transaction: t });
+
       const solicitudCreada = await SolicitudRegistro.create({
         paciente_id: pacienteCreado.id,
         estado: 'PENDIENTE',
@@ -112,6 +112,14 @@ class SolicitudRepository {
     }
   }
 
+  async obtenerResultadosPorSolicitudes(solicitudIds) {
+    const resultados = await ResultadoValidacion.findAll({
+      attributes: ['solicitud_id'],
+      where: { solicitud_id: solicitudIds }
+    });
+    return resultados.map(r => r.solicitud_id);
+  }
+
   async listarSolicitudes({ estado }) {
     return await SolicitudRegistro.findAll({
       where: { estado },
@@ -141,7 +149,7 @@ class SolicitudRepository {
       where: {
         estado: 'PENDIENTE',
         resultados_bd_externas: {
-          [Op.contains]: {errores: {}}
+          [Op.contains]: { errores: {} }
         }
       },
       include: [
@@ -311,7 +319,7 @@ class SolicitudRepository {
     }
   }
 
-   async rechazarSolicitudYEliminarUsuarioPorResultadoValidacion({ resultadoValidacionId, revisadoPor, motivo_decision }) {
+  async rechazarSolicitudYEliminarUsuarioPorResultadoValidacion({ resultadoValidacionId, revisadoPor, motivo_decision }) {
     if (!motivo_decision) {
       const e = new Error('El motivo es obligatorio para RECHAZAR');
       e.status = 400;
@@ -339,7 +347,7 @@ class SolicitudRepository {
       const solicitud = rv.solicitud;
       if (!solicitud) throw new Error('Solicitud asociada no encontrada');
 
-      // 1. Marcar solicitud como RECHAZADA (NO borrar, mantener para auditoría)
+      // 1. Rechazar solicitud
       await solicitud.update({
         estado: 'RECHAZADA',
         revisado_por: revisadoPor ?? solicitud.revisado_por,
@@ -348,28 +356,20 @@ class SolicitudRepository {
         fecha_actualizacion: new Date()
       }, { transaction: t });
 
-      // 2. Desactivar usuario (NO eliminar, mantener para trazabilidad)
+      // 2. Desactivar usuario
       await Usuario.update(
-        {
-          activo: false,
-          fecha_actualizacion: new Date()
-        },
-        {
-          where: { id: solicitud.paciente.usuario_id },
-          transaction: t
-        }
+        { activo: false, fecha_actualizacion: new Date() },
+        { where: { id: solicitud.paciente.usuario_id }, transaction: t }
       );
 
-      // 3. Marcar documentos como RECHAZADOS (NO borrar)
+      // 3. Marcar documentos como RECHAZADOS
       await Documento.update(
         { estado: 'RECHAZADO' },
-        {
-          where: { solicitud_id: solicitud.id },
-          transaction: t
-        }
+        { where: { solicitud_id: solicitud.id }, transaction: t }
       );
 
       await t.commit();
+
       logger.info({
         msg: 'Solicitud rechazada y usuario desactivado por resultado_validacion',
         resultadoValidacionId,
