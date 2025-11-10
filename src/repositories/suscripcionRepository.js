@@ -1,5 +1,6 @@
 import db from '../models/index.js';
 import { v4 as uuidv4 } from 'uuid';
+import { Op } from 'sequelize';
 import logger from '../utils/logger.js';
 
 const Suscripcion = db.Suscripcion;

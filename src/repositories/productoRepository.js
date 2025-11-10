@@ -1,5 +1,8 @@
+import db from "../models/index.js";
 import { sequelize } from '../database/database.js';
-import { QueryTypes } from 'sequelize';
+import { QueryTypes, Op, fn, col } from 'sequelize';
+const { Compra, CalificacionProducto } = db;
+
 import logger from '../utils/logger.js';
 
 /**
@@ -68,4 +71,4 @@ const findAll = async ({ search, category, page = 1, limit = 20 } = {}) => {
   }
 };
 
-export default { findAll };
+export default { findAll};

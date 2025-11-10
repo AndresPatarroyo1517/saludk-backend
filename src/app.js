@@ -23,6 +23,7 @@ import { createBullBoard } from '@bull-board/api';
 import { BullAdapter } from '@bull-board/api/bullAdapter';
 import { ExpressAdapter } from '@bull-board/express';
 import pagoRutas from './routes/pagoRutas.js';
+import kpiRoutes from './routes/kpiRoutes.js';
 
 const app = express();
 
@@ -261,7 +262,7 @@ app.use('/pagos', pagoRutas);
 app.use('/login', loginRoutes);
 app.use('/medicos', medicoRoutes);
 app.use('/calificaciones', calificacionRoutes);
-
+app.use('/metricas', kpiRoutes);
 
 
 export default app;

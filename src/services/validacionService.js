@@ -151,17 +151,34 @@ export const revisarSolicitudAutomaticamente = async (solicitudId, { fachada, us
     }
 };
 
+const filtrarSolicitudesSinValidaciones = async (solicitudes) => {
+    if (!solicitudes || solicitudes.length === 0) return [];
+
+    const solicitudesArray = solicitudes.map(s => s.get({ plain: true }));
+    const solicitudIds = solicitudesArray.map(s => s.id);
+
+    const repo = new SolicitudRepository();
+
+    const idsConValidacion = await repo.obtenerResultadosPorSolicitudes(solicitudIds);
+
+    const solicitudesConValidacion = new Set(idsConValidacion);
+
+    return solicitudes.filter(s => !solicitudesConValidacion.has(s.id));
+};
+
 /** Listar aprobadas para Director */
 export const listarSolicitudesAprobadasDirector = async () => {
     const estado = 'APROBADA';
     const repo = new SolicitudRepository();
-    return await repo.listarSolicitudes({ estado });
+    const solicitudes = await repo.listarSolicitudes({ estado });
+    return await filtrarSolicitudesSinValidaciones(solicitudes);
 };
 
 /** Listar pendientes solo con errores para Director */
 export const listarSolicitudesPendientesConErroresDirector = async () => {
     const repo = new SolicitudRepository();
-    return await repo.listarSolicitudesPendientesConErrores();
+    const solicitudes = await repo.listarSolicitudesPendientesConErrores();
+    return await filtrarSolicitudesSinValidaciones(solicitudes);
 };
 
 async function validarSolicitudModificable(solicitudId) {
