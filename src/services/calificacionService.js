@@ -203,12 +203,12 @@ class CalificacionService {
     try {
       // Crear la calificación con snake_case
       const calificacion = await calificacionRepository.crearCalificacionProducto({
-        paciente_id: pacienteId,  // ✅ CORREGIDO
-        producto_id: productoId,  // ✅ CORREGIDO
-        compra_id: compraId,      // ✅ CORREGIDO
+        paciente_id: pacienteId,  
+        producto_id: productoId,  
+        compra_id: compraId,     
         puntuacion,
         comentario: comentario || null
-      });
+      }); 
 
       // Actualizar el promedio del producto
       await calificacionRepository.actualizarPromedioProducto(productoId);
@@ -260,7 +260,7 @@ class CalificacionService {
     }
 
     // Validación: verificar que el paciente es el dueño de la calificación
-    if (calificacionExistente.paciente_id !== pacienteId) { // ✅ CORREGIDO
+    if (calificacionExistente.paciente_id !== pacienteId) { 
       throw new Error('No tienes permiso para modificar esta calificación');
     }
 
@@ -284,7 +284,7 @@ class CalificacionService {
 
       // Si se actualizó la puntuación, recalcular el promedio del producto
       if (puntuacion !== undefined) {
-        await calificacionRepository.actualizarPromedioProducto(calificacionExistente.producto_id); // ✅ CORREGIDO
+        await calificacionRepository.actualizarPromedioProducto(calificacionExistente.producto_id);   
       }
 
       await transaction.commit();
@@ -305,14 +305,14 @@ class CalificacionService {
     }
 
     // Validación: verificar que el paciente es el dueño de la calificación
-    if (calificacionExistente.paciente_id !== pacienteId) { // ✅ CORREGIDO
+    if (calificacionExistente.paciente_id !== pacienteId) { 
       throw new Error('No tienes permiso para eliminar esta calificación');
     }
 
     const transaction = await sequelize.transaction();
     
     try {
-      const productoId = calificacionExistente.producto_id; // ✅ CORREGIDO
+      const productoId = calificacionExistente.producto_id; 
       
       await calificacionRepository.eliminarCalificacionProducto(id);
       

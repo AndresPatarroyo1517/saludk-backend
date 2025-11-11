@@ -10,10 +10,22 @@ class LoginController {
     try {
       const { email, password, rememberMe = false } = req.body;
 
+      // Validación mejorada
       if (!email || !password) {
         return res.status(400).json({ 
           success: false,
-          message: "Email y contraseña son obligatorios" 
+          message: "Email y contraseña son obligatorios",
+          code: "MISSING_CREDENTIALS"
+        });
+      }
+
+      // Validación de formato de email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({
+          success: false,
+          message: "Formato de email inválido",
+          code: "INVALID_EMAIL"
         });
       }
 
@@ -22,7 +34,10 @@ class LoginController {
       // Configurar cookies
       setAuthCookies(res, result.accessToken, result.refreshToken, rememberMe);
 
-      // Enviar respuesta sin tokens en body (están en cookies)
+      // Log de auditoría (importante para seguridad)
+      console.log(`[LOGIN SUCCESS] User: ${result.usuario.email} | IP: ${req.ip}`);
+
+      // Enviar respuesta sin tokens en body
       res.status(200).json({
         success: true,
         message: result.message,
@@ -30,9 +45,17 @@ class LoginController {
       });
 
     } catch (error) {
-      res.status(error.status || 500).json({
+      // Log de auditoría de fallos
+      console.error(`[LOGIN FAILED] Email: ${req.body?.email} | IP: ${req.ip} | Error: ${error.message}`);
+      
+      // Mapeo seguro de errores (no exponer internals)
+      const statusCode = error.status || 500;
+      const safeMessage = this._getSafeErrorMessage(error);
+      
+      res.status(statusCode).json({
         success: false,
-        message: error.message || "Error al iniciar sesión"
+        message: safeMessage,
+        code: error.code || "LOGIN_ERROR"
       });
     }
   }
@@ -47,7 +70,8 @@ class LoginController {
       if (!refreshToken) {
         return res.status(401).json({
           success: false,
-          message: "Refresh token no proporcionado"
+          message: "Refresh token no proporcionado",
+          code: "MISSING_REFRESH_TOKEN"
         });
       }
 
@@ -68,28 +92,38 @@ class LoginController {
       });
 
     } catch (error) {
-      // Si el refresh token expiró, limpiar cookies
+      // Limpiar cookies si refresh falla
       clearAuthCookies(res);
+      
+      console.error(`[REFRESH FAILED] IP: ${req.ip} | Error: ${error.message}`);
       
       res.status(error.status || 401).json({
         success: false,
-        message: error.message || "Error al refrescar token"
+        message: error.message || "Sesión expirada",
+        code: error.code || "REFRESH_FAILED"
       });
     }
   }
 
   /**
-   * Logout
+   * Logout - CORREGIDO
    */
   async logout(req, res) {
     try {
       const userId = req.user?.userId;
+      const refreshToken = req.cookies?.refreshToken;
 
-      if (userId) {
-        await loginService.logout(userId);
+      // Intentar invalidar en base de datos
+      if (userId && refreshToken) {
+        await loginService.logout(userId, refreshToken);
+        console.log(`[LOGOUT SUCCESS] User ID: ${userId} | IP: ${req.ip}`);
+      } else if (refreshToken) {
+        // Si no hay userId pero sí refreshToken, invalidarlo de todos modos
+        await loginService.invalidateRefreshToken(refreshToken);
+        console.log(`[LOGOUT SUCCESS] Token invalidated | IP: ${req.ip}`);
       }
 
-      // Limpiar cookies
+      // SIEMPRE limpiar cookies, incluso si falla la invalidación en BD
       clearAuthCookies(res);
 
       res.status(200).json({
@@ -98,85 +132,130 @@ class LoginController {
       });
 
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: error.message || "Error al cerrar sesión"
+      console.error(`[LOGOUT ERROR] IP: ${req.ip} | Error: ${error.message}`);
+      
+      // IMPORTANTE: Incluso si hay error, limpiar cookies
+      clearAuthCookies(res);
+      
+      // No devolver 500, logout siempre "funciona" del lado del cliente
+      res.status(200).json({
+        success: true,
+        message: "Sesión cerrada correctamente"
       });
     }
   }
 
   /**
-   * Me
+   * Me - OPTIMIZADO
    */
   async me(req, res) {
-  try {
-    // El middleware de autenticación ya coloca req.user
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: "No autenticado"
-      });
-    }
-
-    const { userId } = req.user;
-
-    // Busca el usuario y sus datos relacionados
-    const usuario = await Usuario.findByPk(userId, {
-      attributes: ['id', 'email', 'rol'], // solo lo necesario
-      include: [
-        {
-          model: Paciente,
-          as: 'paciente',
-          attributes: [
-            'id',
-            'nombres',
-            'apellidos',
-            'fecha_nacimiento',
-            'telefono',
-            'genero',
-            'tipo_identificacion',
-            'numero_identificacion'
-          ],
-          include: [
-            {
-              model: Direccion,
-              as: 'direcciones',
-              attributes: [
-                'direccion_completa',
-                'ciudad',
-                'departamento',
-                'tipo'
-              ]
-            }
-          ]
-        }
-      ]
-    });
-
-    if (!usuario) {
-      return res.status(404).json({
-        success: false,
-        message: "Usuario no encontrado"
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      usuario: {
-        id: usuario.id,
-        email: usuario.email,
-        rol: usuario.rol.toLowerCase(),
-        datos_personales: usuario.paciente || null
+    try {
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          message: "No autenticado",
+          code: "NOT_AUTHENTICATED"
+        });
       }
-    });
 
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      success: false,
-      message: error.message || "Error al obtener datos del usuario"
-    });
+      const { userId } = req.user;
+
+      // Busca el usuario con datos relacionados
+      const usuario = await Usuario.findByPk(userId, {
+        attributes: ['id', 'email', 'rol', 'activo'],
+        include: [
+          {
+            model: Paciente,
+            as: 'paciente',
+            attributes: [
+              'id',
+              'nombres',
+              'apellidos',
+              'fecha_nacimiento',
+              'telefono',
+              'genero',
+              'tipo_identificacion',
+              'numero_identificacion'
+            ],
+            required: false, // LEFT JOIN en vez de INNER JOIN
+            include: [
+              {
+                model: Direccion,
+                as: 'direcciones',
+                attributes: [
+                  'id',
+                  'direccion_completa',
+                  'ciudad',
+                  'departamento',
+                  'tipo'
+                ],
+                required: false
+              }
+            ]
+          }
+        ]
+      });
+
+      if (!usuario) {
+        // Usuario no existe pero tiene token válido = inconsistencia
+        clearAuthCookies(res);
+        return res.status(404).json({
+          success: false,
+          message: "Usuario no encontrado",
+          code: "USER_NOT_FOUND"
+        });
+      }
+
+      // Verificar si cuenta está activa
+      if (!usuario.activo) {
+        clearAuthCookies(res);
+        return res.status(403).json({
+          success: false,
+          message: "Cuenta desactivada",
+          code: "ACCOUNT_DISABLED"
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        usuario: {
+          id: usuario.id,
+          email: usuario.email,
+          rol: usuario.rol.toLowerCase(),
+          activo: usuario.activo,
+          datos_personales: usuario.paciente || null
+        }
+      });
+
+    } catch (error) {
+      console.error(`[ME ERROR] User: ${req.user?.userId} | Error:`, error);
+      res.status(500).json({
+        success: false,
+        message: "Error al obtener datos del usuario",
+        code: "INTERNAL_ERROR"
+      });
+    }
   }
+
+  /**
+   * Mapeo seguro de errores (no exponer detalles internos)
+   */
+  _getSafeErrorMessage(error) {
+    // Errores conocidos y seguros de exponer
+    const safeErrors = [
+      'Credenciales incorrectas',
+      'Usuario no encontrado',
+      'Cuenta inactiva',
+      'Email ya registrado',
+      'Contraseña incorrecta'
+    ];
+
+    if (safeErrors.includes(error.message)) {
+      return error.message;
+    }
+
+    // Para cualquier otro error, mensaje genérico
+    return "Error al iniciar sesión. Intenta nuevamente.";
   }
 }
 

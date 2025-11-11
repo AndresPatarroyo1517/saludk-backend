@@ -50,9 +50,13 @@ export const verifyAccessToken = (token) => {
     return jwt.verify(token, jwtConfig.accessTokenSecret);
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
-      throw new Error('Token expirado');
+      const err = new Error('Token expirado');
+      err.code = 'TOKEN_EXPIRED'; // ✅ Agregar código
+      throw err;
     }
-    throw new Error('Token inválido');
+    const err = new Error('Token inválido');
+    err.code = 'INVALID_TOKEN'; // ✅ Agregar código
+    throw err;
   }
 };
 
@@ -64,9 +68,13 @@ export const verifyRefreshToken = (token) => {
     return jwt.verify(token, jwtConfig.refreshTokenSecret);
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
-      throw new Error('Refresh token expirado');
+      const err = new Error('Refresh token expirado');
+      err.code = 'REFRESH_TOKEN_EXPIRED'; // ✅ Agregar código
+      throw err;
     }
-    throw new Error('Refresh token inválido');
+    const err = new Error('Refresh token inválido');
+    err.code = 'INVALID_REFRESH_TOKEN'; // ✅ Agregar código
+    throw err;
   }
 };
 
@@ -82,14 +90,14 @@ export const setAuthCookies = (res, accessToken, refreshToken, rememberMe = fals
   res.cookie('accessToken', accessToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: 'strict', // ✅ CAMBIO: 'lax' -> 'strict' para mayor seguridad
     maxAge: accessTokenMaxAge
   });
 
   res.cookie('refreshToken', refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: 'strict', // ✅ CAMBIO: 'lax' -> 'strict'
     maxAge: refreshTokenMaxAge
   });
 };
@@ -98,12 +106,20 @@ export const setAuthCookies = (res, accessToken, refreshToken, rememberMe = fals
  * Limpia cookies de autenticación
  */
 export const clearAuthCookies = (res) => {
-  res.clearCookie('accessToken');
-  res.clearCookie('refreshToken');
+  res.clearCookie('accessToken', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict'
+  });
+  res.clearCookie('refreshToken', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict'
+  });
 };
 
 /**
- * Middleware de autenticación
+ * Middleware de autenticación - MEJORADO
  */
 export const authMiddleware = (req, res, next) => {
   try {
@@ -120,7 +136,8 @@ export const authMiddleware = (req, res, next) => {
     if (!token) {
       return res.status(401).json({
         success: false,
-        error: 'Token no proporcionado'
+        message: 'Token no proporcionado', // ✅ Cambio: 'error' -> 'message'
+        code: 'MISSING_TOKEN' // ✅ Agregar código
       });
     }
 
@@ -138,20 +155,15 @@ export const authMiddleware = (req, res, next) => {
   } catch (error) {
     logger.security('AUTHENTICATION_FAILED', {
       error: error.message,
+      code: error.code, // ✅ Agregar código al log
       ip: req.ip
     });
 
-    if (error.message === 'Token expirado') {
-      return res.status(401).json({
-        success: false,
-        error: 'Token expirado',
-        code: 'TOKEN_EXPIRED'
-      });
-    }
-
-    res.status(401).json({
+    // ✅ Respuesta consistente con el controller
+    return res.status(401).json({
       success: false,
-      error: 'Token inválido'
+      message: error.message,
+      code: error.code || 'AUTHENTICATION_FAILED'
     });
   }
 };
@@ -164,7 +176,8 @@ export const checkRole = (...allowedRoles) => {
     if (!req.user) {
       return res.status(401).json({
         success: false,
-        error: 'No autenticado'
+        message: 'No autenticado', // ✅ Cambio: 'error' -> 'message'
+        code: 'NOT_AUTHENTICATED'
       });
     }
 
@@ -179,7 +192,8 @@ export const checkRole = (...allowedRoles) => {
 
       return res.status(403).json({
         success: false,
-        error: 'No tiene permisos para acceder a este recurso'
+        message: 'No tiene permisos para acceder a este recurso', // ✅ Cambio
+        code: 'INSUFFICIENT_PERMISSIONS' // ✅ Agregar código
       });
     }
 
