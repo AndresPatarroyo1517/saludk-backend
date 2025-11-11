@@ -267,6 +267,94 @@ class CitaController {
       });
     }
   };
+
+  /**
+   * GET /citas/paciente/:pacienteId
+   * Obtiene todas las citas de un paciente con filtros opcionales
+   */
+  obtenerCitasPaciente = async (req, res) => {
+    try {
+      const { pacienteId } = req.params;
+      const { estado, fecha_desde, fecha_hasta, modalidad, ordenar_por } = req.query;
+
+      if (!pacienteId) {
+        return res.status(400).json({
+          error: 'El parámetro pacienteId es requerido'
+        });
+      }
+
+      const filtros = {
+        estado: estado || null,
+        fecha_desde: fecha_desde || null,
+        fecha_hasta: fecha_hasta || null,
+        modalidad: modalidad || null,
+        ordenar_por: ordenar_por || 'fecha_hora'
+      };
+
+      const citas = await this.service.obtenerCitasPaciente(pacienteId, filtros);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          paciente_id: pacienteId,
+          total_citas: citas.length,
+          citas
+        }
+      });
+
+    } catch (error) {
+      console.error('Error al obtener citas del paciente:', error);
+      res.status(500).json({
+        error: 'Error al obtener las citas del paciente',
+        mensaje: error.message
+      });
+    }
+  };
+
+  /**
+   * DELETE /citas/:citaId/cancelar
+   * Cancela una cita (solo si está en estado AGENDADA o CONFIRMADA)
+   */
+  cancelarCita = async (req, res) => {
+    try {
+      const { citaId } = req.params;
+      const { motivo_cancelacion } = req.body;
+
+      if (!citaId) {
+        return res.status(400).json({
+          error: 'El parámetro citaId es requerido'
+        });
+      }
+
+      const citaCancelada = await this.service.cancelarCita(citaId, motivo_cancelacion);
+
+      res.status(200).json({
+        success: true,
+        mensaje: 'Cita cancelada exitosamente',
+        data: citaCancelada
+      });
+
+    } catch (error) {
+      console.error('Error al cancelar cita:', error);
+
+      if (error.message === 'Cita no encontrada') {
+        return res.status(404).json({
+          error: error.message
+        });
+      }
+
+      if (error.message.includes('No se puede cancelar')) {
+        return res.status(400).json({
+          error: error.message
+        });
+      }
+
+      res.status(500).json({
+        error: 'Error al cancelar la cita',
+        mensaje: error.message
+      });
+    }
+  };
 }
 
 export default CitaController;

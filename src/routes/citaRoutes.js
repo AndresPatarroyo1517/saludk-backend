@@ -579,4 +579,326 @@ router.get('/disponibilidad/:medicoId/proximos-slots', controller.obtenerProximo
 
 router.post('/', controller.crearCita);
 
+/**
+ * @swagger
+ * /citas/paciente/{pacienteId}:
+ *   get:
+ *     summary: Obtener todas las citas de un paciente
+ *     description: Retorna un listado completo de citas del paciente con información del médico, filtros opcionales por estado, fecha, modalidad y opciones de ordenamiento.
+ *     tags:
+ *       - Citas
+ *     parameters:
+ *       - in: path
+ *         name: pacienteId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: UUID del paciente
+ *         example: "550e8400-e29b-41d4-a716-446655440000"
+ *       - in: query
+ *         name: estado
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [AGENDADA, CONFIRMADA, COMPLETADA, CANCELADA]
+ *         description: Filtrar por estado de la cita
+ *         example: AGENDADA
+ *       - in: query
+ *         name: fecha_desde
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filtrar citas desde esta fecha (YYYY-MM-DD)
+ *         example: "2025-11-10"
+ *       - in: query
+ *         name: fecha_hasta
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filtrar citas hasta esta fecha (YYYY-MM-DD)
+ *         example: "2025-12-10"
+ *       - in: query
+ *         name: modalidad
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [PRESENCIAL, VIRTUAL]
+ *         description: Filtrar por modalidad de consulta
+ *         example: VIRTUAL
+ *       - in: query
+ *         name: ordenar_por
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [fecha_hora, fecha_hora_asc, estado]
+ *           default: "fecha_hora"
+ *         description: |
+ *           Campo por el cual ordenar los resultados:
+ *           - **fecha_hora**: Ordenar por fecha descendente (más recientes primero)
+ *           - **fecha_hora_asc**: Ordenar por fecha ascendente (próximas primero)
+ *           - **estado**: Ordenar por estado y luego por fecha
+ *         example: "fecha_hora_asc"
+ *     responses:
+ *       200:
+ *         description: Citas obtenidas exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     paciente_id:
+ *                       type: string
+ *                       format: uuid
+ *                       example: "550e8400-e29b-41d4-a716-446655440000"
+ *                     total_citas:
+ *                       type: integer
+ *                       example: 5
+ *                     citas:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                             format: uuid
+ *                           paciente_id:
+ *                             type: string
+ *                             format: uuid
+ *                           medico_id:
+ *                             type: string
+ *                             format: uuid
+ *                           medico:
+ *                             type: object
+ *                             properties:
+ *                               id:
+ *                                 type: string
+ *                                 format: uuid
+ *                               nombres:
+ *                                 type: string
+ *                               apellidos:
+ *                                 type: string
+ *                               especialidad:
+ *                                 type: string
+ *                               calificacion_promedio:
+ *                                 type: number
+ *                           fecha_hora:
+ *                             type: string
+ *                             format: date-time
+ *                           modalidad:
+ *                             type: string
+ *                             enum: [PRESENCIAL, VIRTUAL]
+ *                           estado:
+ *                             type: string
+ *                             enum: [AGENDADA, CONFIRMADA, COMPLETADA, CANCELADA]
+ *                           motivo_consulta:
+ *                             type: string
+ *                             nullable: true
+ *                           enlace_virtual:
+ *                             type: string
+ *                             nullable: true
+ *                           notas_consulta:
+ *                             type: string
+ *                             nullable: true
+ *                           costo_pagado:
+ *                             type: number
+ *                             nullable: true
+ *                           fecha_creacion:
+ *                             type: string
+ *                             format: date-time
+ *                           fecha_actualizacion:
+ *                             type: string
+ *                             format: date-time
+ *             examples:
+ *               conCitas:
+ *                 summary: Paciente con citas
+ *                 value:
+ *                   success: true
+ *                   data:
+ *                     paciente_id: "550e8400-e29b-41d4-a716-446655440000"
+ *                     total_citas: 2
+ *                     citas:
+ *                       - id: "660e8400-e29b-41d4-a716-446655440001"
+ *                         paciente_id: "550e8400-e29b-41d4-a716-446655440000"
+ *                         medico_id: "0336963c-9912-4dda-92c0-eedd85a06581"
+ *                         medico:
+ *                           id: "0336963c-9912-4dda-92c0-eedd85a06581"
+ *                           nombres: "Juan"
+ *                           apellidos: "García"
+ *                           especialidad: "Cardiología"
+ *                           calificacion_promedio: 4.8
+ *                         fecha_hora: "2025-11-15T10:30:00.000Z"
+ *                         modalidad: "VIRTUAL"
+ *                         estado: "AGENDADA"
+ *                         motivo_consulta: "Chequeo general"
+ *                         enlace_virtual: "https://meet.tuapp.com/abc123"
+ *                         notas_consulta: null
+ *                         costo_pagado: null
+ *                         fecha_creacion: "2025-11-10T08:00:00.000Z"
+ *                         fecha_actualizacion: "2025-11-10T08:00:00.000Z"
+ *               sinCitas:
+ *                 summary: Paciente sin citas
+ *                 value:
+ *                   success: true
+ *                   data:
+ *                     paciente_id: "550e8400-e29b-41d4-a716-446655440000"
+ *                     total_citas: 0
+ *                     citas: []
+ *       400:
+ *         description: Parámetro pacienteId faltante
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "El parámetro pacienteId es requerido"
+ *       500:
+ *         description: Error interno del servidor
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Error al obtener las citas del paciente"
+ */
+router.get('/paciente/:pacienteId', controller.obtenerCitasPaciente);
+
+/**
+ * @swagger
+ * /citas/{citaId}/cancelar:
+ *   delete:
+ *     summary: Cancelar una cita médica
+ *     description: |
+ *       Cancela una cita existente con validaciones importantes:
+ *       - Solo se pueden cancelar citas en estado AGENDADA o CONFIRMADA
+ *       - Debe haber al menos 24 horas de anticipación
+ *       - Se registra el motivo de cancelación (opcional)
+ *       
+ *       **Estados de cita permitidos para cancelación:**
+ *       - AGENDADA - Cita recién creada
+ *       - CONFIRMADA - Cita confirmada por ambas partes
+ *       
+ *       **No se pueden cancelar citas en estos estados:**
+ *       - COMPLETADA - Cita ya realizada
+ *       - CANCELADA - Cita ya cancelada
+ *     tags:
+ *       - Citas
+ *     parameters:
+ *       - in: path
+ *         name: citaId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: UUID de la cita a cancelar
+ *         example: "660e8400-e29b-41d4-a716-446655440001"
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               motivo_cancelacion:
+ *                 type: string
+ *                 description: Motivo por el cual se cancela la cita (opcional)
+ *                 example: "Cambio de planes"
+ *           examples:
+ *             conMotivo:
+ *               summary: Cancelación con motivo
+ *               value:
+ *                 motivo_cancelacion: "Cambio de planes"
+ *             sinMotivo:
+ *               summary: Cancelación sin motivo
+ *               value: {}
+ *     responses:
+ *       200:
+ *         description: Cita cancelada exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 mensaje:
+ *                   type: string
+ *                   example: "Cita cancelada exitosamente"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                       example: "660e8400-e29b-41d4-a716-446655440001"
+ *                     estado:
+ *                       type: string
+ *                       example: "CANCELADA"
+ *                     fecha_hora:
+ *                       type: string
+ *                       format: date-time
+ *                       example: "2025-11-15T10:30:00.000Z"
+ *                     medico_id:
+ *                       type: string
+ *                       format: uuid
+ *                     paciente_id:
+ *                       type: string
+ *                       format: uuid
+ *                     mensaje:
+ *                       type: string
+ *                       example: "Cita cancelada exitosamente"
+ *       400:
+ *         description: Error de validación (cita no cancelable o sin anticipación)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *             examples:
+ *               estadoInvalido:
+ *                 summary: Cita no puede ser cancelada
+ *                 value:
+ *                   error: "No se puede cancelar una cita en estado COMPLETADA. Solo se pueden cancelar citas en estado AGENDADA o CONFIRMADA"
+ *               sinAnticipacion:
+ *                 summary: Sin 24 horas de anticipación
+ *                 value:
+ *                   error: "No se puede cancelar una cita con menos de 24 horas de anticipación. Por favor, comuníquese con la clínica."
+ *       404:
+ *         description: Cita no encontrada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Cita no encontrada"
+ *       500:
+ *         description: Error interno del servidor
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Error al cancelar la cita"
+ */
+router.delete('/:citaId/cancelar', controller.cancelarCita);
+
 export default router;

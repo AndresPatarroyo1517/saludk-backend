@@ -94,6 +94,84 @@ class CitaRepository {
   }
 
   /**
+   * Obtiene todas las citas de un paciente con filtros opcionales
+   */
+  async obtenerCitasPaciente(pacienteId, estado = null, fechaDesde = null, fechaHasta = null, modalidad = null, ordenarPor = 'fecha_hora') {
+    const whereClause = { paciente_id: pacienteId };
+
+    // Filtro por estado
+    if (estado) {
+      whereClause.estado = estado;
+    }
+
+    // Filtro por rango de fechas
+    if (fechaDesde || fechaHasta) {
+      whereClause.fecha_hora = {};
+      if (fechaDesde) {
+        whereClause.fecha_hora[Op.gte] = new Date(fechaDesde);
+      }
+      if (fechaHasta) {
+        whereClause.fecha_hora[Op.lte] = new Date(fechaHasta);
+      }
+    }
+
+    // Filtro por modalidad
+    if (modalidad) {
+      whereClause.modalidad = modalidad.toUpperCase();
+    }
+
+    // Definir orden
+    let order = [['fecha_hora', 'DESC']];
+    if (ordenarPor === 'fecha_hora_asc') {
+      order = [['fecha_hora', 'ASC']];
+    } else if (ordenarPor === 'estado') {
+      order = [['estado', 'ASC'], ['fecha_hora', 'DESC']];
+    }
+
+    const citas = await this.Cita.findAll({
+      where: whereClause,
+      include: [
+        {
+          association: 'medico',
+          attributes: ['id', 'nombres', 'apellidos', 'especialidad', 'calificacion_promedio']
+        }
+      ],
+      order,
+      raw: false
+    });
+
+    return citas;
+  }
+
+  /**
+   * Obtiene una cita por su ID
+   */
+  async obtenerCitaPorId(citaId) {
+    return await this.Cita.findByPk(citaId, {
+      include: [
+        {
+          association: 'medico',
+          attributes: ['id', 'nombres', 'apellidos', 'especialidad']
+        }
+      ]
+    });
+  }
+
+  /**
+   * Actualiza una cita existente
+   */
+  async actualizarCita(citaId, datosActualizados) {
+    const cita = await this.Cita.findByPk(citaId);
+
+    if (!cita) {
+      throw new Error('Cita no encontrada');
+    }
+
+    const citaActualizada = await cita.update(datosActualizados);
+    return citaActualizada.toJSON ? citaActualizada.toJSON() : citaActualizada;
+  }
+
+  /**
    * Crea una nueva cita en la base de datos
    * AGREGADO: Método que faltaba
    */

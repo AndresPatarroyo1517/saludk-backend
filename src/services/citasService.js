@@ -276,6 +276,95 @@ class CitaService {
   }
 
   /**
+   * Obtiene todas las citas de un paciente con filtros opcionales
+   */
+  async obtenerCitasPaciente(pacienteId, filtros = {}) {
+    const { estado, fecha_desde, fecha_hasta, modalidad, ordenar_por = 'fecha_hora' } = filtros;
+
+    const citas = await this.repository.obtenerCitasPaciente(
+      pacienteId,
+      estado,
+      fecha_desde,
+      fecha_hasta,
+      modalidad,
+      ordenar_por
+    );
+
+    if (citas.length === 0) {
+      return [];
+    }
+
+    // Enriquecer datos de citas con información del médico
+    return citas.map(cita => ({
+      id: cita.id,
+      paciente_id: cita.paciente_id,
+      medico_id: cita.medico_id,
+      medico: {
+        id: cita.medico?.id,
+        nombres: cita.medico?.nombres,
+        apellidos: cita.medico?.apellidos,
+        especialidad: cita.medico?.especialidad,
+        calificacion_promedio: cita.medico?.calificacion_promedio
+      },
+      fecha_hora: cita.fecha_hora,
+      modalidad: cita.modalidad,
+      estado: cita.estado,
+      motivo_consulta: cita.motivo_consulta,
+      enlace_virtual: cita.enlace_virtual,
+      notas_consulta: cita.notas_consulta,
+      costo_pagado: cita.costo_pagado,
+      fecha_creacion: cita.fecha_creacion,
+      fecha_actualizacion: cita.fecha_actualizacion
+    }));
+  }
+
+  /**
+   * Cancela una cita (solo si está en estado AGENDADA o CONFIRMADA)
+   */
+  async cancelarCita(citaId, motivo_cancelacion = null) {
+    const cita = await this.repository.obtenerCitaPorId(citaId);
+
+    if (!cita) {
+      throw new Error('Cita no encontrada');
+    }
+
+    // Validar que la cita pueda ser cancelada
+    if (!['AGENDADA', 'CONFIRMADA'].includes(cita.estado)) {
+      throw new Error(
+        `No se puede cancelar una cita en estado ${cita.estado}. ` +
+        `Solo se pueden cancelar citas en estado AGENDADA o CONFIRMADA`
+      );
+    }
+
+    // Validar que la cita no sea en el pasado (con 24 horas de anticipación)
+    const ahora = new Date();
+    const veinticuatroHoras = 24 * 60 * 60 * 1000;
+    const fechaCita = new Date(cita.fecha_hora);
+
+    if (fechaCita.getTime() - ahora.getTime() < veinticuatroHoras) {
+      throw new Error(
+        'No se puede cancelar una cita con menos de 24 horas de anticipación. ' +
+        'Por favor, comuníquese con la clínica.'
+      );
+    }
+
+    // Actualizar cita a CANCELADA
+    const citaCancelada = await this.repository.actualizarCita(citaId, {
+      estado: 'CANCELADA',
+      notas_consulta: motivo_cancelacion ? `Cancelada: ${motivo_cancelacion}` : 'Cancelada por paciente'
+    });
+
+    return {
+      id: citaCancelada.id,
+      estado: citaCancelada.estado,
+      fecha_hora: citaCancelada.fecha_hora,
+      medico_id: citaCancelada.medico_id,
+      paciente_id: citaCancelada.paciente_id,
+      mensaje: 'Cita cancelada exitosamente'
+    };
+  }
+
+  /**
    * Genera un enlace virtual para la cita
    */
   _generarEnlaceVirtual() {
