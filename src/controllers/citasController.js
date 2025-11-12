@@ -81,7 +81,7 @@ class CitaController {
       });
 
     } catch (error) {
-      console.error('Error al obtener disponibilidad:', error);
+      console.error('Error al obtener disponibilidad: - citasController.js:84', error);
       
       if (error.message === 'Médico no encontrado') {
         return res.status(404).json({
@@ -133,7 +133,7 @@ class CitaController {
       });
 
     } catch (error) {
-      console.error('Error al validar slot:', error);
+      console.error('Error al validar slot: - citasController.js:136', error);
       res.status(500).json({
         error: 'Error al validar disponibilidad',
         mensaje: error.message
@@ -186,7 +186,7 @@ class CitaController {
       });
 
     } catch (error) {
-      console.error('Error al obtener próximos slots:', error);
+      console.error('Error al obtener próximos slots: - citasController.js:189', error);
       
       if (error.message === 'Médico no encontrado') {
         return res.status(404).json({
@@ -242,14 +242,21 @@ class CitaController {
         duracion_minutos
       });
 
+      const notificacionEnviada = !!cita.notificacion_enviada;
       res.status(201).json({
         success: true,
-        mensaje: 'Cita creada exitosamente',
-        data: cita
+        mensaje: notificacionEnviada
+          ? 'Cita creada exitosamente. Se ha enviado una confirmación por correo.'
+          : 'Cita creada exitosamente. No se pudo enviar la confirmación por correo.',
+        data: cita,
+        notificacion: {
+          enviada: notificacionEnviada,
+          tipo: 'email'
+        }
       });
 
     } catch (error) {
-      console.error('Error al crear cita:', error);
+      console.error('Error al crear cita: - citasController.js:259', error);
 
       if (error.message.includes('no encontrado')) {
         return res.status(404).json({ error: error.message });
@@ -303,7 +310,7 @@ class CitaController {
       });
 
     } catch (error) {
-      console.error('Error al obtener citas del paciente:', error);
+      console.error('Error al obtener citas del paciente: - citasController.js:313', error);
       res.status(500).json({
         error: 'Error al obtener las citas del paciente',
         mensaje: error.message
@@ -335,7 +342,7 @@ class CitaController {
       });
 
     } catch (error) {
-      console.error('Error al cancelar cita:', error);
+      console.error('Error al cancelar cita: - citasController.js:345', error);
 
       if (error.message === 'Cita no encontrada') {
         return res.status(404).json({

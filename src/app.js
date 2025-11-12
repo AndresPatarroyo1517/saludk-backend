@@ -25,6 +25,7 @@ import { ExpressAdapter } from '@bull-board/express';
 import pagoRutas from './routes/pagoRutas.js';
 import kpiRoutes from './routes/kpiRoutes.js';
 import PromocionesRoutes from './routes/promocionesRoutes.js';
+import recomendacionesRoutes from './routes/recomendacionesRoutes.js';
 
 const app = express();
 
@@ -257,6 +258,7 @@ app.use('/suscripcion', SuscripcionRoutes);
 app.use('/planes', PlanRoutes);
 app.use('/registro', registroRoutes);
 app.use('/productos', ProductosRoutes);
+app.use('/productos/recomendaciones', recomendacionesRoutes);
 app.use('/validacion', validacionRoute);
 app.use('/citas', citaRoutes);
 app.use('/pagos', pagoRutas);

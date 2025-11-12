@@ -8,7 +8,7 @@ class notificationService {
       service: 'gmail', 
       auth: {
         user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+        pass: process.env.SMTP_PASSWORD,
       },
     });
   }
@@ -35,6 +35,32 @@ class notificationService {
       return { success: true };
     } catch (err) {
       logger.error(`Error al enviar correo: ${err.message}`);
+      throw new Error('No se pudo enviar la notificación por correo.');
+    }
+  }
+
+  /**
+   * Envía un correo con HTML
+   * @param {Object} options - configuración del mensaje
+   * @param {string[]} options.destinatarios - lista de correos
+   * @param {string} options.asunto - asunto del correo
+   * @param {string} options.html - cuerpo HTML del mensaje
+   */
+  async enviarEmailHTML({ destinatarios, asunto, html }) {
+    try {
+      const mailOptions = {
+        from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+        to: destinatarios.join(', '),
+        subject: asunto,
+        html: html,
+      };
+
+      await this.transporter.sendMail(mailOptions);
+
+      logger.info(`Correo HTML enviado a: ${destinatarios.join(', ')}`);
+      return { success: true };
+    } catch (err) {
+      logger.error(`Error al enviar correo HTML: ${err.message}`);
       throw new Error('No se pudo enviar la notificación por correo.');
     }
   }

@@ -1,4 +1,7 @@
 import CitaRepository from '../repositories/citasRepository.js';
+import notificationService from './notificationService.js';
+import db from '../models/index.js';
+import logger from '../utils/logger.js';
 
 class CitaService {
   constructor() {
@@ -262,6 +265,56 @@ class CitaService {
       enlace_virtual: modalidad === 'VIRTUAL' ? this._generarEnlaceVirtual() : null
     });
 
+    // Enviar notificación al paciente (mejor esfuerzo) y devolver indicador
+    let notificacionEnviada = false;
+    try {
+      const paciente = await db.Paciente.findByPk(paciente_id, {
+        include: [{ model: db.Usuario, as: 'usuario' }]
+      });
+
+      const medico = await db.Medico.findByPk(medico_id, {
+        include: [{ model: db.Usuario, as: 'usuario' }]
+      });
+
+      if (paciente && paciente.usuario && paciente.usuario.email) {
+        const fechaFormato = new Date(citaCreada.fecha_hora).toLocaleString('es-ES', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+
+        const nombreMedico = medico ? `${medico.usuario?.nombres} ${medico.usuario?.apellidos}` : 'Médico';
+        const asunto = 'Confirmación de tu cita médica';
+        const html = `
+          <h2>¡Cita agendada exitosamente!</h2>
+          <p>Hola ${paciente.usuario?.nombres},</p>
+          <p>Tu cita ha sido agendada correctamente:</p>
+          <ul>
+            <li><strong>Médico:</strong> ${nombreMedico}</li>
+            <li><strong>Fecha y Hora:</strong> ${fechaFormato}</li>
+            <li><strong>Modalidad:</strong> ${citaCreada.modalidad}</li>
+            ${citaCreada.motivo_consulta ? `<li><strong>Motivo:</strong> ${citaCreada.motivo_consulta}</li>` : ''}
+            ${citaCreada.enlace_virtual ? `<li><strong>Enlace Virtual:</strong> <a href="${citaCreada.enlace_virtual}">${citaCreada.enlace_virtual}</a></li>` : ''}
+          </ul>
+          <p>Si necesitas cambiar o cancelar tu cita, contáctanos.</p>
+        `;
+
+        await notificationService.enviarEmailHTML({
+          destinatarios: [paciente.usuario.email],
+          asunto: asunto,
+          html: html
+        });
+
+        logger.info(`Notificación de cita enviada a ${paciente.usuario.email}`);
+        notificacionEnviada = true;
+      }
+    } catch (err) {
+      logger.warn(`Error enviando notificación de cita creada: ${err.message}`);
+      // No lanzar excepción, solo registrar. notificacionEnviada queda false
+    }
+
     return {
       id: citaCreada.id,
       paciente_id: citaCreada.paciente_id,
@@ -271,7 +324,8 @@ class CitaService {
       estado: citaCreada.estado,
       motivo_consulta: citaCreada.motivo_consulta,
       enlace_virtual: citaCreada.enlace_virtual,
-      duracion_estimada_minutos: duracion_minutos
+      duracion_estimada_minutos: duracion_minutos,
+      notificacion_enviada: notificacionEnviada
     };
   }
 

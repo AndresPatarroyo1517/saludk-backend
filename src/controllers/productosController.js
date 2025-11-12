@@ -1,4 +1,5 @@
 import productosService from '../services/productosService.js';
+import compraPromocionService from '../services/compraPromocionService.js';
 import logger from '../utils/logger.js';
 
 class ProductosController {
@@ -41,7 +42,7 @@ class ProductosController {
   async procesarCompra(req, res) {
     try {
       const pacienteId = req.pacienteId || req.headers['x-paciente-id'];
-      const { items, metodoPago = 'TARJETA' } = req.body;
+      const { items, metodoPago = 'TARJETA', codigoPromocion = null } = req.body;
 
       if (!pacienteId) {
         return res.status(401).json({ 
@@ -59,7 +60,39 @@ class ProductosController {
 
       logger.info(`🛒 Procesando compra para paciente ${pacienteId} | Items: ${items.length} | Método: ${metodoPago}`);
 
-      const resumen = await productosService.procesarCompra(pacienteId, items, metodoPago);
+      let resumen = await productosService.procesarCompra(pacienteId, items, metodoPago);
+      let montoFinal = resumen.compra.total;
+      let descuentoAplicado = 0;
+      let promocionData = null;
+
+      // Si se proporcionó código de promoción, intentar aplicarlo
+      if (codigoPromocion) {
+        logger.info(`💳 Intentando aplicar promoción: ${codigoPromocion}`);
+        const resultadoPromocion = await compraPromocionService.aplicarCodigoPromocion(
+          codigoPromocion,
+          pacienteId,
+          montoFinal
+        );
+
+        if (resultadoPromocion.valida) {
+          descuentoAplicado = resultadoPromocion.descuentoAplicado;
+          montoFinal = resultadoPromocion.montoFinal;
+          promocionData = {
+            codigoPromocion,
+            nombre: resultadoPromocion.promocion.nombre,
+            porcentajeDescuento: resultadoPromocion.promocion.valor_descuento,
+            descuentoAplicado,
+            montoFinal
+          };
+          logger.info(`✅ Promoción aplicada: -$${descuentoAplicado}`);
+        } else {
+          logger.warn(`❌ Promoción no válida: ${resultadoPromocion.error}`);
+          return res.status(400).json({
+            success: false,
+            error: resultadoPromocion.error
+          });
+        }
+      }
 
       // Preparar respuesta según método de pago
       const response = {
@@ -67,7 +100,10 @@ class ProductosController {
         message: 'Compra procesada correctamente.',
         data: {
           compra: resumen.compra,
-          ordenPago: resumen.ordenPago
+          ordenPago: resumen.ordenPago,
+          montoFinal,
+          descuentoAplicado,
+          promocion: promocionData
         }
       };
 

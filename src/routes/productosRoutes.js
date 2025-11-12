@@ -41,14 +41,14 @@ router.get('/', async (req, res) => ProductosController.consultarCatalogo(req, r
 
 /**
  * POST /productos/compra
- * Body: { items: [ { productId, cantidad } ] }
+ * Body: { items: [ { productId, cantidad } ], codigoPromocion: "CODIGO123" (opcional) }
  * Requires auth
  */
 /**
  * @swagger
  * /productos/compra:
  *   post:
- *     summary: Procesar compra de productos
+ *     summary: Procesar compra de productos con soporte de código de promoción
  *     tags: [Productos]
  *     parameters:
  *       - in: header
@@ -72,9 +72,49 @@ router.get('/', async (req, res) => ProductosController.consultarCatalogo(req, r
  *                       type: string
  *                     cantidad:
  *                       type: integer
+ *               codigoPromocion:
+ *                 type: string
+ *                 description: Código de promoción opcional (aplica descuento porcentual)
+ *               metodoPago:
+ *                 type: string
+ *                 enum: [TARJETA, PSE, CONSIGNACION]
+ *                 default: TARJETA
  *     responses:
  *       200:
  *         description: Compra procesada correctamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     compra:
+ *                       type: object
+ *                     montoFinal:
+ *                       type: number
+ *                     descuentoAplicado:
+ *                       type: number
+ *                     promocion:
+ *                       type: object
+ *                       properties:
+ *                         codigoPromocion:
+ *                           type: string
+ *                         nombre:
+ *                           type: string
+ *                         porcentajeDescuento:
+ *                           type: number
+ *                         descuentoAplicado:
+ *                           type: number
+ *                         montoFinal:
+ *                           type: number
+ *       400:
+ *         description: Código de promoción inválido o datos faltantes
  *       401:
  *         description: Paciente no autenticado
  *       403:
