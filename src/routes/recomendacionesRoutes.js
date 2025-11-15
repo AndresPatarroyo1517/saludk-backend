@@ -1,5 +1,6 @@
 import express from 'express';
 import RecomendacionesController from '../controllers/recomendacionesController.js';
+import { requirePaciente } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
@@ -12,17 +13,12 @@ const router = express.Router();
 
 /**
  * @swagger
- * /productos/recomendaciones/{userId}:
+ * /productos/recomendaciones:
  *   get:
- *     summary: Obtener recomendaciones de productos para un usuario
+ *     summary: Obtener recomendaciones de productos para el paciente autenticado
  *     tags: [Recomendaciones]
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: true
- *         schema:
- *           type: string
- *         description: ID del paciente/usuario
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Recomendaciones obtenidas exitosamente
@@ -42,12 +38,18 @@ const router = express.Router();
  *                       type: integer
  *                     recomendaciones:
  *                       type: array
- *       400:
- *         description: userId no proporcionado
+ *       401:
+ *         description: No autenticado
+ *       403:
+ *         description: No es paciente
  *       500:
  *         description: Error interno
  */
-router.get('/:userId', async (req, res) => RecomendacionesController.obtenerRecomendaciones(req, res));
+router.get('/', requirePaciente, async (req, res) => {
+  // El userId ahora viene de req.user.paciente.id
+  req.params.userId = req.user.paciente.id;
+  return RecomendacionesController.obtenerRecomendaciones(req, res);
+});
 
 /**
  * @swagger
@@ -55,6 +57,8 @@ router.get('/:userId', async (req, res) => RecomendacionesController.obtenerReco
  *   get:
  *     summary: Obtener productos similares a uno específico
  *     tags: [Recomendaciones]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: productoId
@@ -65,9 +69,15 @@ router.get('/:userId', async (req, res) => RecomendacionesController.obtenerReco
  *     responses:
  *       200:
  *         description: Productos similares obtenidos
+ *       401:
+ *         description: No autenticado
+ *       403:
+ *         description: No es paciente
  *       404:
  *         description: Producto no encontrado
  */
-router.get('/:productoId/similares', async (req, res) => RecomendacionesController.obtenerProductosSimilares(req, res));
+router.get('/:productoId/similares', requirePaciente, async (req, res) => {
+  return RecomendacionesController.obtenerProductosSimilares(req, res);
+});
 
 export default router;

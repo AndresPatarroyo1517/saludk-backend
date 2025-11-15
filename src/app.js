@@ -15,6 +15,7 @@ import validacionRoute from './routes/validacionRoutes.js';
 import loginRoutes from './routes/loginRoutes.js';
 import medicoRoutes from './routes/medicoRoutes.js';
 import calificacionRoutes from './routes/calificacionRoutes.js';
+import historialMedicoRoutes from './routes/historialMedicoRoutes.js';
 import citaRoutes from './routes/citaRoutes.js'; 
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './docs/swagger.js';
@@ -22,7 +23,7 @@ import cookieParser from 'cookie-parser';
 import { createBullBoard } from '@bull-board/api';
 import { BullAdapter } from '@bull-board/api/bullAdapter';
 import { ExpressAdapter } from '@bull-board/express';
-import pagoRutas from './routes/pagoRutas.js';
+import pagoRutas from './routes/pagoRoutes.js';
 import kpiRoutes from './routes/kpiRoutes.js';
 import PromocionesRoutes from './routes/promocionesRoutes.js';
 import recomendacionesRoutes from './routes/recomendacionesRoutes.js';
@@ -267,6 +268,7 @@ app.use('/medicos', medicoRoutes);
 app.use('/calificaciones', calificacionRoutes);
 app.use('/metricas', kpiRoutes);
 app.use('/promociones', PromocionesRoutes);
+app.use('/historialMedico', historialMedicoRoutes);
 
 
 export default app;

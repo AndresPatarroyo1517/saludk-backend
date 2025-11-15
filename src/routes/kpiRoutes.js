@@ -1,5 +1,6 @@
 import express from 'express';
 import { getKPIs } from '../controllers/kpiController.js';
+import { requireDirector } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
@@ -7,10 +8,17 @@ const router = express.Router();
  * @openapi
  * /metricas/kpi:
  *   get:
- *     summary: Obtener KPIs de la plataforma de salud
- *     description: Retorna todos los KPIs principales incluyendo número de citas, ingresos, calificaciones, pacientes premium/estándar, resumen de estado de citas y solicitudes.
+ *     summary: Obtener KPIs de la plataforma de salud (SOLO DIRECTOR MÉDICO)
+ *     description: |
+ *       Retorna todos los KPIs principales incluyendo número de citas, ingresos, 
+ *       calificaciones, pacientes premium/estándar, resumen de estado de citas y solicitudes.
+ *       
+ *       **REQUIERE:** Rol DIRECTOR_MEDICO
+ *       
+ *       Información sensible que solo debe ser accesible por administradores.
  *     tags: [KPI]
- *     security: [ { bearerAuth: [] } ]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: filtro
@@ -43,36 +51,56 @@ const router = express.Router();
  *               properties:
  *                 numeroCitas:
  *                   type: integer
+ *                   description: Número total de citas
  *                 resumenCitas:
  *                   type: object
  *                   properties:
- *                     total: { type: integer }
- *                     agendadas: { type: integer }
- *                     completadas: { type: integer }
- *                     canceladas: { type: integer }
+ *                     total:
+ *                       type: integer
+ *                     agendadas:
+ *                       type: integer
+ *                     completadas:
+ *                       type: integer
+ *                     canceladas:
+ *                       type: integer
  *                 ingresosTotales:
  *                   type: number
+ *                   description: Ingresos totales en el período
  *                 calificacionMedicos:
  *                   type: number
+ *                   description: Calificación promedio de médicos
  *                 calificacionProductos:
  *                   type: number
+ *                   description: Calificación promedio de productos
  *                 pacientesSuscripciones:
  *                   type: object
  *                   properties:
- *                     total: { type: integer }
- *                     premium: { type: integer }
- *                     estandar: { type: integer }
+ *                     total:
+ *                       type: integer
+ *                     premium:
+ *                       type: integer
+ *                     estandar:
+ *                       type: integer
  *                 resumenSolicitudes:
  *                   type: object
  *                   properties:
- *                     total: { type: integer }
- *                     pendiente: { type: integer }
- *                     aprobada: { type: integer }
- *                     rechazada: { type: integer }
- *                     devuelta: { type: integer }
+ *                     total:
+ *                       type: integer
+ *                     pendiente:
+ *                       type: integer
+ *                     aprobada:
+ *                       type: integer
+ *                     rechazada:
+ *                       type: integer
+ *                     devuelta:
+ *                       type: integer
+ *       '401':
+ *         description: No autorizado (sin token o token inválido)
+ *       '403':
+ *         description: Permisos insuficientes (no es Director Médico)
  *       '500':
  *         description: Error al obtener KPIs
  */
-router.get('/kpi', getKPIs);
+router.get('/kpi', requireDirector, getKPIs);
 
 export default router;

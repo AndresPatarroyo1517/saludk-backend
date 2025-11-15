@@ -1,6 +1,6 @@
 import express from 'express';
 import SuscripcionController from '../controllers/suscripcionController.js';
-import { authMiddleware } from '../middlewares/authMiddleware.js';
+import { requirePaciente } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
@@ -15,22 +15,20 @@ const router = express.Router();
  * @swagger
  * /suscripcion:
  *   post:
- *     summary: Crear una nueva suscripción
+ *     summary: Crear una nueva suscripción para el paciente autenticado
  *     description: Permite al paciente seleccionar un plan y generar una orden de pago.
  *     tags: [Suscripción]
- *     parameters:
- *       - in: header
- *         name: x-paciente-id
- *         required: true
- *         schema:
- *           type: string
- *         description: UUID del paciente autenticado
+ *     security:
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - planId
+ *               - metodoPago
  *             properties:
  *               planId:
  *                 type: string
@@ -57,31 +55,37 @@ const router = express.Router();
  *                   type: object
  *       400:
  *         description: Error en los datos de entrada
+ *       401:
+ *         description: No autenticado
+ *       403:
+ *         description: No es paciente
  *       500:
  *         description: Error interno del servidor
  */
-router.post('/', authMiddleware, (req, res) => SuscripcionController.crearSuscripcion(req, res));
+router.post('/', requirePaciente, (req, res) => {
+  // El pacienteId ahora viene de req.user.paciente.id
+  req.body.pacienteId = req.user.paciente.id;
+  return SuscripcionController.crearSuscripcion(req, res);
+});
 
 /**
  * @swagger
  * /suscripcion/pago:
  *   post:
- *     summary: Procesar pago de una suscripción existente
+ *     summary: Procesar pago de una suscripción existente del paciente autenticado
  *     description: Permite procesar un pago asociado a una suscripción activa o pendiente.
  *     tags: [Suscripción]
- *     parameters:
- *       - in: header
- *         name: x-paciente-id
- *         required: true
- *         schema:
- *           type: string
- *         description: UUID del paciente autenticado
+ *     security:
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - suscripcionId
+ *               - metodoPago
  *             properties:
  *               suscripcionId:
  *                 type: string
@@ -104,11 +108,40 @@ router.post('/', authMiddleware, (req, res) => SuscripcionController.crearSuscri
  *                 message:
  *                   type: string
  *                   example: "Pago procesado correctamente."
+ *       401:
+ *         description: No autenticado
+ *       403:
+ *         description: No es paciente o suscripción no pertenece al paciente
  *       404:
  *         description: Suscripción no encontrada
  *       500:
  *         description: Error interno del servidor
  */
-router.post('/pago', authMiddleware, (req, res) => SuscripcionController.procesarPago(req, res));
+router.post('/pago', requirePaciente, (req, res) => {
+  // El pacienteId ahora viene de req.user.paciente.id
+  req.body.pacienteId = req.user.paciente.id;
+  return SuscripcionController.procesarPago(req, res);
+});
+
+/**
+ * @swagger
+ * /suscripcion/mis-suscripciones:
+ *   get:
+ *     summary: Obtener todas las suscripciones del paciente autenticado
+ *     tags: [Suscripción]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lista de suscripciones
+ *       401:
+ *         description: No autenticado
+ *       403:
+ *         description: No es paciente
+ */
+router.get('/mis-suscripciones', requirePaciente, (req, res) => {
+  req.params.pacienteId = req.user.paciente.id;
+  return SuscripcionController.obtenerMisSuscripciones(req, res);
+});
 
 export default router;

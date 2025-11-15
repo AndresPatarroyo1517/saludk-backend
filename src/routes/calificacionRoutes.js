@@ -1,7 +1,19 @@
 import express from 'express';
 import calificacionController from '../controllers/calificacionController.js';
+import { requirePaciente, authMiddleware} from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
+
+/**
+ * @swagger
+ * tags:
+ *   - name: Calificaciones Médicos
+ *     description: Endpoints para gestionar calificaciones de médicos
+ *   - name: Calificaciones Productos
+ *     description: Endpoints para gestionar calificaciones de productos
+ *   - name: Calificaciones Generales
+ *     description: Endpoints generales de calificaciones
+ */
 
 // ==================== RUTAS DE CALIFICACIONES DE MÉDICOS ====================
 
@@ -9,8 +21,10 @@ const router = express.Router();
  * @swagger
  * /calificaciones/medicos:
  *   post:
- *     summary: Crear una calificación para un médico
+ *     summary: Crear una calificación para un médico (solo pacientes)
  *     tags: [Calificaciones Médicos]
+ *     security:
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -18,44 +32,41 @@ const router = express.Router();
  *           schema:
  *             type: object
  *             required:
- *               - pacienteId
  *               - medicoId
  *               - citaId
  *               - puntuacion
  *             properties:
- *               pacienteId:
- *                 type: string
- *                 format: uuid
- *                 example: "123e4567-e89b-12d3-a456-426614174000"
  *               medicoId:
  *                 type: string
  *                 format: uuid
- *                 example: "123e4567-e89b-12d3-a456-426614174001"
  *               citaId:
  *                 type: string
  *                 format: uuid
- *                 example: "123e4567-e89b-12d3-a456-426614174002"
  *               puntuacion:
  *                 type: integer
  *                 minimum: 1
  *                 maximum: 5
- *                 example: 5
  *               comentario:
  *                 type: string
- *                 example: "Excelente atención, muy profesional"
  *     responses:
  *       201:
  *         description: Calificación creada exitosamente
- *       400:
- *         description: Error en la validación o la cita no está completada
+ *       401:
+ *         description: No autenticado
+ *       403:
+ *         description: No es paciente
  */
-router.post('/medicos', calificacionController.crearCalificacionMedico);
+router.post('/medicos', requirePaciente, (req, res) => {
+  // El pacienteId viene de req.user.paciente.id
+  req.body.pacienteId = req.user.paciente.id;
+  return calificacionController.crearCalificacionMedico(req, res);
+});
 
 /**
  * @swagger
  * /calificaciones/medicos/{id}:
  *   get:
- *     summary: Obtener una calificación de médico por ID
+ *     summary: Obtener una calificación de médico por ID (público)
  *     tags: [Calificaciones Médicos]
  *     parameters:
  *       - in: path
@@ -64,7 +75,6 @@ router.post('/medicos', calificacionController.crearCalificacionMedico);
  *         schema:
  *           type: string
  *           format: uuid
- *         description: ID de la calificación
  *     responses:
  *       200:
  *         description: Calificación encontrada
@@ -77,8 +87,10 @@ router.get('/medicos/:id', calificacionController.obtenerCalificacionMedicoPorId
  * @swagger
  * /calificaciones/medicos/{id}:
  *   put:
- *     summary: Actualizar una calificación de médico
+ *     summary: Actualizar una calificación de médico (solo el paciente que la creó)
  *     tags: [Calificaciones Médicos]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -92,12 +104,7 @@ router.get('/medicos/:id', calificacionController.obtenerCalificacionMedicoPorId
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - pacienteId
  *             properties:
- *               pacienteId:
- *                 type: string
- *                 format: uuid
  *               puntuacion:
  *                 type: integer
  *                 minimum: 1
@@ -107,19 +114,24 @@ router.get('/medicos/:id', calificacionController.obtenerCalificacionMedicoPorId
  *     responses:
  *       200:
  *         description: Calificación actualizada
- *       400:
- *         description: Error en la validación
+ *       401:
+ *         description: No autenticado
  *       403:
- *         description: No autorizado
+ *         description: No autorizado (no es el paciente que creó la calificación)
  */
-router.put('/medicos/:id', calificacionController.actualizarCalificacionMedico);
+router.put('/medicos/:id', requirePaciente, (req, res) => {
+  req.body.pacienteId = req.user.paciente.id;
+  return calificacionController.actualizarCalificacionMedico(req, res);
+});
 
 /**
  * @swagger
  * /calificaciones/medicos/{id}:
  *   delete:
- *     summary: Eliminar una calificación de médico
+ *     summary: Eliminar una calificación de médico (solo el paciente que la creó)
  *     tags: [Calificaciones Médicos]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -127,33 +139,26 @@ router.put('/medicos/:id', calificacionController.actualizarCalificacionMedico);
  *         schema:
  *           type: string
  *           format: uuid
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - pacienteId
- *             properties:
- *               pacienteId:
- *                 type: string
- *                 format: uuid
  *     responses:
  *       200:
  *         description: Calificación eliminada
+ *       401:
+ *         description: No autenticado
  *       403:
  *         description: No autorizado
  *       404:
  *         description: Calificación no encontrada
  */
-router.delete('/medicos/:id', calificacionController.eliminarCalificacionMedico);
+router.delete('/medicos/:id', requirePaciente, (req, res) => {
+  req.body.pacienteId = req.user.paciente.id;
+  return calificacionController.eliminarCalificacionMedico(req, res);
+});
 
 /**
  * @swagger
  * /calificaciones/medicos/medico/{medicoId}:
  *   get:
- *     summary: Obtener todas las calificaciones de un médico
+ *     summary: Obtener todas las calificaciones de un médico (público)
  *     tags: [Calificaciones Médicos]
  *     parameters:
  *       - in: path
@@ -166,40 +171,15 @@ router.delete('/medicos/:id', calificacionController.eliminarCalificacionMedico)
  *         name: puntuacionMin
  *         schema:
  *           type: integer
- *           minimum: 1
- *           maximum: 5
- *         description: Filtrar por puntuación mínima
  *       - in: query
  *         name: puntuacionMax
  *         schema:
  *           type: integer
- *           minimum: 1
- *           maximum: 5
- *         description: Filtrar por puntuación máxima
- *       - in: query
- *         name: fechaDesde
- *         schema:
- *           type: string
- *           format: date
- *         description: Filtrar desde fecha
- *       - in: query
- *         name: fechaHasta
- *         schema:
- *           type: string
- *           format: date
- *         description: Filtrar hasta fecha
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
  *           default: 50
- *         description: Cantidad de resultados por página
- *       - in: query
- *         name: offset
- *         schema:
- *           type: integer
- *           default: 0
- *         description: Número de resultados a saltar
  *     responses:
  *       200:
  *         description: Lista de calificaciones
@@ -210,7 +190,7 @@ router.get('/medicos/medico/:medicoId', calificacionController.obtenerCalificaci
  * @swagger
  * /calificaciones/medicos/medico/{medicoId}/estadisticas:
  *   get:
- *     summary: Obtener estadísticas de calificaciones de un médico
+ *     summary: Obtener estadísticas de calificaciones de un médico (público)
  *     tags: [Calificaciones Médicos]
  *     parameters:
  *       - in: path
@@ -222,32 +202,6 @@ router.get('/medicos/medico/:medicoId', calificacionController.obtenerCalificaci
  *     responses:
  *       200:
  *         description: Estadísticas de calificaciones
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 promedio:
- *                   type: number
- *                   example: 4.5
- *                 total:
- *                   type: integer
- *                   example: 120
- *                 minimo:
- *                   type: integer
- *                   example: 1
- *                 maximo:
- *                   type: integer
- *                   example: 5
- *                 distribucion:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       puntuacion:
- *                         type: integer
- *                       cantidad:
- *                         type: integer
  */
 router.get('/medicos/medico/:medicoId/estadisticas', calificacionController.obtenerEstadisticasMedico);
 
@@ -257,8 +211,10 @@ router.get('/medicos/medico/:medicoId/estadisticas', calificacionController.obte
  * @swagger
  * /calificaciones/productos:
  *   post:
- *     summary: Crear una calificación para un producto
+ *     summary: Crear una calificación para un producto (solo pacientes)
  *     tags: [Calificaciones Productos]
+ *     security:
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -266,14 +222,10 @@ router.get('/medicos/medico/:medicoId/estadisticas', calificacionController.obte
  *           schema:
  *             type: object
  *             required:
- *               - pacienteId
  *               - productoId
  *               - compraId
  *               - puntuacion
  *             properties:
- *               pacienteId:
- *                 type: string
- *                 format: uuid
  *               productoId:
  *                 type: string
  *                 format: uuid
@@ -289,16 +241,21 @@ router.get('/medicos/medico/:medicoId/estadisticas', calificacionController.obte
  *     responses:
  *       201:
  *         description: Calificación creada exitosamente
- *       400:
- *         description: Error en la validación
+ *       401:
+ *         description: No autenticado
+ *       403:
+ *         description: No es paciente
  */
-router.post('/productos', calificacionController.crearCalificacionProducto);
+router.post('/productos', requirePaciente, (req, res) => {
+  req.body.pacienteId = req.user.paciente.id;
+  return calificacionController.crearCalificacionProducto(req, res);
+});
 
 /**
  * @swagger
  * /calificaciones/productos/{id}:
  *   get:
- *     summary: Obtener una calificación de producto por ID
+ *     summary: Obtener una calificación de producto por ID (público)
  *     tags: [Calificaciones Productos]
  *     parameters:
  *       - in: path
@@ -319,8 +276,10 @@ router.get('/productos/:id', calificacionController.obtenerCalificacionProductoP
  * @swagger
  * /calificaciones/productos/{id}:
  *   put:
- *     summary: Actualizar una calificación de producto
+ *     summary: Actualizar una calificación de producto (solo el paciente que la creó)
  *     tags: [Calificaciones Productos]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -334,12 +293,7 @@ router.get('/productos/:id', calificacionController.obtenerCalificacionProductoP
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - pacienteId
  *             properties:
- *               pacienteId:
- *                 type: string
- *                 format: uuid
  *               puntuacion:
  *                 type: integer
  *                 minimum: 1
@@ -349,17 +303,24 @@ router.get('/productos/:id', calificacionController.obtenerCalificacionProductoP
  *     responses:
  *       200:
  *         description: Calificación actualizada
- *       400:
- *         description: Error en la validación
+ *       401:
+ *         description: No autenticado
+ *       403:
+ *         description: No autorizado
  */
-router.put('/productos/:id', calificacionController.actualizarCalificacionProducto);
+router.put('/productos/:id', requirePaciente, (req, res) => {
+  req.body.pacienteId = req.user.paciente.id;
+  return calificacionController.actualizarCalificacionProducto(req, res);
+});
 
 /**
  * @swagger
  * /calificaciones/productos/{id}:
  *   delete:
- *     summary: Eliminar una calificación de producto
+ *     summary: Eliminar una calificación de producto (solo el paciente que la creó)
  *     tags: [Calificaciones Productos]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -367,31 +328,24 @@ router.put('/productos/:id', calificacionController.actualizarCalificacionProduc
  *         schema:
  *           type: string
  *           format: uuid
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - pacienteId
- *             properties:
- *               pacienteId:
- *                 type: string
- *                 format: uuid
  *     responses:
  *       200:
  *         description: Calificación eliminada
+ *       401:
+ *         description: No autenticado
  *       403:
  *         description: No autorizado
  */
-router.delete('/productos/:id', calificacionController.eliminarCalificacionProducto);
+router.delete('/productos/:id', requirePaciente, (req, res) => {
+  req.body.pacienteId = req.user.paciente.id;
+  return calificacionController.eliminarCalificacionProducto(req, res);
+});
 
 /**
  * @swagger
  * /calificaciones/productos/producto/{productoId}:
  *   get:
- *     summary: Obtener todas las calificaciones de un producto
+ *     summary: Obtener todas las calificaciones de un producto (público)
  *     tags: [Calificaciones Productos]
  *     parameters:
  *       - in: path
@@ -400,34 +354,6 @@ router.delete('/productos/:id', calificacionController.eliminarCalificacionProdu
  *         schema:
  *           type: string
  *           format: uuid
- *       - in: query
- *         name: puntuacionMin
- *         schema:
- *           type: integer
- *       - in: query
- *         name: puntuacionMax
- *         schema:
- *           type: integer
- *       - in: query
- *         name: fechaDesde
- *         schema:
- *           type: string
- *           format: date
- *       - in: query
- *         name: fechaHasta
- *         schema:
- *           type: string
- *           format: date
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 50
- *       - in: query
- *         name: offset
- *         schema:
- *           type: integer
- *           default: 0
  *     responses:
  *       200:
  *         description: Lista de calificaciones
@@ -438,7 +364,7 @@ router.get('/productos/producto/:productoId', calificacionController.obtenerCali
  * @swagger
  * /calificaciones/productos/producto/{productoId}/estadisticas:
  *   get:
- *     summary: Obtener estadísticas de calificaciones de un producto
+ *     summary: Obtener estadísticas de calificaciones de un producto (público)
  *     tags: [Calificaciones Productos]
  *     parameters:
  *       - in: path
@@ -457,41 +383,30 @@ router.get('/productos/producto/:productoId/estadisticas', calificacionControlle
 
 /**
  * @swagger
- * /calificaciones/paciente/{pacienteId}:
+ * /calificaciones/mis-calificaciones:
  *   get:
- *     summary: Obtener todas las calificaciones realizadas por un paciente
+ *     summary: Obtener todas las calificaciones realizadas por el paciente autenticado
  *     tags: [Calificaciones Generales]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: pacienteId
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
  *       - in: query
  *         name: tipo
  *         schema:
  *           type: string
  *           enum: [medicos, productos, ambos]
  *           default: ambos
- *         description: Tipo de calificaciones a obtener
  *     responses:
  *       200:
  *         description: Calificaciones del paciente
- *       400:
- *         description: Tipo de calificación inválido
+ *       401:
+ *         description: No autenticado
+ *       403:
+ *         description: No es paciente
  */
-router.get('/paciente/:pacienteId', calificacionController.obtenerCalificacionesPorPaciente);
-
-/**
- * @swagger
- * tags:
- *   - name: Calificaciones Médicos
- *     description: Endpoints para gestionar calificaciones de médicos
- *   - name: Calificaciones Productos
- *     description: Endpoints para gestionar calificaciones de productos
- *   - name: Calificaciones Generales
- *     description: Endpoints generales de calificaciones
- */
+router.get('/mis-calificaciones', requirePaciente, (req, res) => {
+  req.params.pacienteId = req.user.paciente.id;
+  return calificacionController.obtenerCalificacionesPorPaciente(req, res);
+});
 
 export default router;

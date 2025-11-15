@@ -1,5 +1,8 @@
 import jwt from 'jsonwebtoken';
 import logger from '../utils/logger.js';
+import db from '../models/index.js';
+
+const { Medico, Paciente, Usuario } = db;
 
 const jwtConfig = {
   accessTokenSecret: process.env.JWT_ACCESS_SECRET,
@@ -51,11 +54,11 @@ export const verifyAccessToken = (token) => {
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
       const err = new Error('Token expirado');
-      err.code = 'TOKEN_EXPIRED'; // ✅ Agregar código
+      err.code = 'TOKEN_EXPIRED';
       throw err;
     }
     const err = new Error('Token inválido');
-    err.code = 'INVALID_TOKEN'; // ✅ Agregar código
+    err.code = 'INVALID_TOKEN';
     throw err;
   }
 };
@@ -69,11 +72,11 @@ export const verifyRefreshToken = (token) => {
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
       const err = new Error('Refresh token expirado');
-      err.code = 'REFRESH_TOKEN_EXPIRED'; // ✅ Agregar código
+      err.code = 'REFRESH_TOKEN_EXPIRED';
       throw err;
     }
     const err = new Error('Refresh token inválido');
-    err.code = 'INVALID_REFRESH_TOKEN'; // ✅ Agregar código
+    err.code = 'INVALID_REFRESH_TOKEN';
     throw err;
   }
 };
@@ -90,14 +93,14 @@ export const setAuthCookies = (res, accessToken, refreshToken, rememberMe = fals
   res.cookie('accessToken', accessToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict', // ✅ CAMBIO: 'lax' -> 'strict' para mayor seguridad
+    sameSite: 'strict',
     maxAge: accessTokenMaxAge
   });
 
   res.cookie('refreshToken', refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict', // ✅ CAMBIO: 'lax' -> 'strict'
+    sameSite: 'strict',
     maxAge: refreshTokenMaxAge
   });
 };
@@ -119,9 +122,46 @@ export const clearAuthCookies = (res) => {
 };
 
 /**
- * Middleware de autenticación - MEJORADO
+ * Middleware de autenticación - MEJORADO CON CARGA DE ENTIDADES
+ * 
+ * Después de este middleware, req.user tendrá la siguiente estructura según el rol:
+ * 
+ * ROL MEDICO:
+ * req.user = {
+ *   userId: UUID,
+ *   email: string,
+ *   rol: 'MEDICO',
+ *   medico: {
+ *     id: UUID,
+ *     nombres: string,
+ *     apellidos: string,
+ *     especialidad: string,
+ *     registro_medico: string
+ *   }
+ * }
+ * 
+ * ROL PACIENTE:
+ * req.user = {
+ *   userId: UUID,
+ *   email: string,
+ *   rol: 'PACIENTE',
+ *   paciente: {
+ *     id: UUID,
+ *     nombres: string,
+ *     apellidos: string,
+ *     numero_identificacion: string,
+ *     tipo_sangre: string
+ *   }
+ * }
+ * 
+ * ROL DIRECTOR_MEDICO:
+ * req.user = {
+ *   userId: UUID,
+ *   email: string,
+ *   rol: 'DIRECTOR_MEDICO'
+ * }
  */
-export const authMiddleware = (req, res, next) => {
+export const authMiddleware = async (req, res, next) => {
   try {
     // Intentar obtener token de cookie primero, luego de header
     let token = req.cookies?.accessToken;
@@ -136,18 +176,136 @@ export const authMiddleware = (req, res, next) => {
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: 'Token no proporcionado', // ✅ Cambio: 'error' -> 'message'
-        code: 'MISSING_TOKEN' // ✅ Agregar código
+        message: 'Token no proporcionado',
+        code: 'MISSING_TOKEN'
       });
     }
 
     const decoded = verifyAccessToken(token);
 
+    // Estructura base del usuario
     req.user = {
       userId: decoded.userId,
       email: decoded.email,
       rol: decoded.rol
     };
+
+    // Cargar entidad según el rol
+    switch (decoded.rol) {
+      case 'MEDICO': {
+        const medico = await Medico.findOne({ 
+          where: { usuario_id: decoded.userId },
+          attributes: ['id', 'nombres', 'apellidos', 'especialidad', 'registro_medico', 'disponible']
+        });
+        
+        if (!medico) {
+          logger.error('MEDICO_NOT_FOUND', {
+            userId: decoded.userId,
+            email: decoded.email
+          });
+          return res.status(403).json({
+            success: false,
+            message: 'Perfil de médico no encontrado. Contacte al administrador.',
+            code: 'MEDICO_NOT_FOUND'
+          });
+        }
+
+        if (!medico.disponible) {
+          logger.security('MEDICO_DISABLED_ACCESS', {
+            medicoId: medico.id,
+            userId: decoded.userId
+          });
+          return res.status(403).json({
+            success: false,
+            message: 'Su cuenta de médico está deshabilitada.',
+            code: 'MEDICO_DISABLED'
+          });
+        }
+        
+        req.user.medico = {
+          id: medico.id,
+          nombres: medico.nombres,
+          apellidos: medico.apellidos,
+          especialidad: medico.especialidad,
+          registro_medico: medico.registro_medico
+        };
+        break;
+      }
+
+      case 'PACIENTE': {
+        const paciente = await Paciente.findOne({ 
+          where: { usuario_id: decoded.userId },
+          attributes: ['id', 'nombres', 'apellidos', 'numero_identificacion', 'tipo_sangre', 'genero', 'fecha_nacimiento']
+        });
+        
+        if (!paciente) {
+          logger.error('PACIENTE_NOT_FOUND', {
+            userId: decoded.userId,
+            email: decoded.email
+          });
+          return res.status(403).json({
+            success: false,
+            message: 'Perfil de paciente no encontrado. Contacte al administrador.',
+            code: 'PACIENTE_NOT_FOUND'
+          });
+        }
+        
+        req.user.paciente = {
+          id: paciente.id,
+          nombres: paciente.nombres,
+          apellidos: paciente.apellidos,
+          numero_identificacion: paciente.numero_identificacion,
+          tipo_sangre: paciente.tipo_sangre,
+          genero: paciente.genero,
+          fecha_nacimiento: paciente.fecha_nacimiento
+        };
+        break;
+      }
+
+      case 'DIRECTOR_MEDICO': {
+        // Director médico no requiere carga adicional, solo validar que el usuario exista
+        const usuario = await Usuario.findOne({
+          where: { id: decoded.userId },
+          attributes: ['id', 'activo']
+        });
+
+        if (!usuario) {
+          logger.error('DIRECTOR_NOT_FOUND', {
+            userId: decoded.userId,
+            email: decoded.email
+          });
+          return res.status(403).json({
+            success: false,
+            message: 'Usuario no encontrado.',
+            code: 'USER_NOT_FOUND'
+          });
+        }
+
+        if (!usuario.activo) {
+          logger.security('DIRECTOR_DISABLED_ACCESS', {
+            userId: decoded.userId
+          });
+          return res.status(403).json({
+            success: false,
+            message: 'Su cuenta está deshabilitada.',
+            code: 'USER_DISABLED'
+          });
+        }
+        break;
+      }
+
+      default: {
+        logger.security('UNKNOWN_ROLE', {
+          userId: decoded.userId,
+          rol: decoded.rol
+        });
+        return res.status(403).json({
+          success: false,
+          message: 'Rol de usuario no reconocido.',
+          code: 'UNKNOWN_ROLE'
+        });
+      }
+    }
 
     req.app.locals.currentUserId = decoded.userId;
     next();
@@ -155,11 +313,10 @@ export const authMiddleware = (req, res, next) => {
   } catch (error) {
     logger.security('AUTHENTICATION_FAILED', {
       error: error.message,
-      code: error.code, // ✅ Agregar código al log
+      code: error.code,
       ip: req.ip
     });
 
-    // ✅ Respuesta consistente con el controller
     return res.status(401).json({
       success: false,
       message: error.message,
@@ -170,13 +327,14 @@ export const authMiddleware = (req, res, next) => {
 
 /**
  * Middleware para verificar roles
+ * Uso: checkRole('MEDICO', 'DIRECTOR_MEDICO')
  */
 export const checkRole = (...allowedRoles) => {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({
         success: false,
-        message: 'No autenticado', // ✅ Cambio: 'error' -> 'message'
+        message: 'No autenticado',
         code: 'NOT_AUTHENTICATED'
       });
     }
@@ -192,8 +350,9 @@ export const checkRole = (...allowedRoles) => {
 
       return res.status(403).json({
         success: false,
-        message: 'No tiene permisos para acceder a este recurso', // ✅ Cambio
-        code: 'INSUFFICIENT_PERMISSIONS' // ✅ Agregar código
+        message: `Acceso denegado. Se requiere uno de los siguientes roles: ${allowedRoles.join(', ')}`,
+        code: 'INSUFFICIENT_PERMISSIONS',
+        requiredRoles: allowedRoles
       });
     }
 
@@ -203,8 +362,9 @@ export const checkRole = (...allowedRoles) => {
 
 /**
  * Middleware de autenticación opcional
+ * Intenta autenticar pero no falla si no hay token
  */
-export const optionalAuth = (req, res, next) => {
+export const optionalAuth = async (req, res, next) => {
   try {
     let token = req.cookies?.accessToken;
     
@@ -217,17 +377,62 @@ export const optionalAuth = (req, res, next) => {
 
     if (token) {
       const decoded = verifyAccessToken(token);
+      
       req.user = {
         userId: decoded.userId,
         email: decoded.email,
         rol: decoded.rol
       };
+
+      // Cargar entidad según el rol (simplificado para optional)
+      if (decoded.rol === 'MEDICO') {
+        const medico = await Medico.findOne({ 
+          where: { usuario_id: decoded.userId },
+          attributes: ['id']
+        });
+        if (medico) {
+          req.user.medico = { id: medico.id };
+        }
+      } else if (decoded.rol === 'PACIENTE') {
+        const paciente = await Paciente.findOne({ 
+          where: { usuario_id: decoded.userId },
+          attributes: ['id']
+        });
+        if (paciente) {
+          req.user.paciente = { id: paciente.id };
+        }
+      }
     }
   } catch (error) {
     // Ignorar errores en auth opcional
+    logger.debug('Optional auth failed', { error: error.message });
   }
   next();
 };
+
+/**
+ * Middleware específico para verificar solo rol MEDICO
+ * Simplifica el uso en rutas médicas
+ */
+export const requireMedico = [authMiddleware, checkRole('MEDICO')];
+
+/**
+ * Middleware específico para verificar solo rol PACIENTE
+ * Simplifica el uso en rutas de pacientes
+ */
+export const requirePaciente = [authMiddleware, checkRole('PACIENTE')];
+
+/**
+ * Middleware específico para verificar solo rol DIRECTOR_MEDICO
+ * Simplifica el uso en rutas administrativas
+ */
+export const requireDirector = [authMiddleware, checkRole('DIRECTOR_MEDICO')];
+
+/**
+ * Middleware para rutas que pueden ser accedidas por MEDICO o DIRECTOR_MEDICO
+ * Útil para reportes o estadísticas médicas
+ */
+export const requireMedicoOrDirector = [authMiddleware, checkRole('MEDICO', 'DIRECTOR_MEDICO')];
 
 export default {
   generateAccessToken,
@@ -238,5 +443,9 @@ export default {
   clearAuthCookies,
   authMiddleware,
   checkRole,
-  optionalAuth
+  optionalAuth,
+  requireMedico,
+  requirePaciente,
+  requireDirector,
+  requireMedicoOrDirector
 };

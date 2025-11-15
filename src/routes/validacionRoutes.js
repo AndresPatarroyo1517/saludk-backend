@@ -1,6 +1,6 @@
 import express from 'express';
 import { revisar, listarAprobadas, listarPendientesConErrores, aprobarDirector, devolverDirector, rechazarDirector } from '../controllers/validacionController.js';
-import authMiddleware from '../middlewares/authMiddleware.js';
+import { requireDirector } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
@@ -8,7 +8,7 @@ const router = express.Router();
  * @openapi
  * tags:
  *   - name: Validacion
- *     description: Endpoints para validar las solicitudes
+ *     description: Endpoints para validar las solicitudes (Solo Director Médico)
  */
 
 /**
@@ -67,8 +67,10 @@ const router = express.Router();
  *   post:
  *     summary: Revisión automática de riesgos (HU-04)
  *     description: |
- *       Consulta bases externas (clínicas y policiales) y actualiza el estado de la solicitud:
- *
+ *       Consulta bases externas (clínicas y policiales) y actualiza el estado de la solicitud.
+ *       
+ *       **REQUIERE:** Rol DIRECTOR_MEDICO
+ *       
  *       - **APROBADA** si no hay fraude.
  *       - **RECHAZADA** si se detecta fraude.
  *       - Si ocurre un error al consultar las bases, **mantiene PENDIENTE** y permite revisión manual.
@@ -93,72 +95,71 @@ const router = express.Router();
  *               oneOf:
  *                 - $ref: '#/components/schemas/RevisionExitosa'
  *                 - $ref: '#/components/schemas/RevisionPendientePorError'
- *             examples:
- *               aprobada:
- *                 summary: Solicitud aprobada
- *                 value:
- *                   estado: APROBADA
- *                   resultado:
- *                     clinico: { antecedentes: [] }
- *                     policia: { tieneFraude: false, registros: [] }
- *               rechazada:
- *                 summary: Solicitud rechazada por fraude
- *                 value:
- *                   estado: RECHAZADA
- *                   resultado:
- *                     clinico: { antecedentes: [] }
- *                     policia:
- *                       tieneFraude: true
- *                       registros:
- *                         - tipo: "fraude"
- *                           descripcion: "Fraude a aseguradora"
  *       '400':
  *         description: Solicitud no está en estado PENDIENTE o error de validación
  *       '401':
- *         description: No autorizado (token inválido o ausente)
+ *         description: No autorizado
+ *       '403':
+ *         description: No es Director Médico
  *       '404':
  *         description: Solicitud no encontrada
  */
-router.post('/solicitudes/:id/revisar', revisar);
+router.post('/solicitudes/:id/revisar', requireDirector, revisar);
 
 /**
  * @openapi
  * /validacion/solicitudes/aprobadas:
  *   get:
- *     summary: Listar solicitudes APROBADAS (Director Médico)
+ *     summary: Listar solicitudes APROBADAS
+ *     description: Requiere rol DIRECTOR_MEDICO
  *     tags: [Validacion]
- *     security: [ { bearerAuth: [] } ]
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       '200':
  *         description: Lista de solicitudes aprobadas con datos de paciente y validaciones
+ *       '401':
+ *         description: No autorizado
+ *       '403':
+ *         description: No es Director Médico
  */
-router.get('/solicitudes/aprobadas', listarAprobadas); //Poner authToken
+router.get('/solicitudes/aprobadas', requireDirector, listarAprobadas);
 
 /**
  * @openapi
  * /validacion/solicitudes/pendientes-con-errores:
  *   get:
- *     summary: Listar solicitudes PENDIENTES pero solo si tienen errores en resultados_bd_externas
+ *     summary: Listar solicitudes PENDIENTES con errores en resultados_bd_externas
+ *     description: Requiere rol DIRECTOR_MEDICO
  *     tags: [Validacion]
- *     security: [ { bearerAuth: [] } ]
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       '200':
  *         description: Lista de solicitudes pendientes con errores
+ *       '401':
+ *         description: No autorizado
+ *       '403':
+ *         description: No es Director Médico
  */
-router.get('/solicitudes/pendientes-con-errores', listarPendientesConErrores); //Poner authToken
+router.get('/solicitudes/pendientes-con-errores', requireDirector, listarPendientesConErrores);
 
 /**
  * @openapi
  * /validacion/solicitudes/{id}/aprobar:
  *   post:
  *     summary: Aprobar por Director (crea resultado_validacion y activa usuario)
+ *     description: Requiere rol DIRECTOR_MEDICO
  *     tags: [Validacion]
- *     security: [ { bearerAuth: [] } ]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         schema: { type: string, format: uuid }
+ *         schema:
+ *           type: string
+ *           format: uuid
  *     requestBody:
  *       required: false
  *       content:
@@ -166,25 +167,37 @@ router.get('/solicitudes/pendientes-con-errores', listarPendientesConErrores); /
  *           schema:
  *             type: object
  *             properties:
- *               motivo_decision: { type: string }
+ *               motivo_decision:
+ *                 type: string
  *     responses:
  *       '200':
  *         description: Solicitud aprobada y usuario activado
+ *       '401':
+ *         description: No autorizado
+ *       '403':
+ *         description: No es Director Médico
  */
-router.post('/solicitudes/:id/aprobar', aprobarDirector); //Poner authToken
+router.post('/solicitudes/:id/aprobar', requireDirector, aprobarDirector);
 
 /**
  * @openapi
  * /validacion/solicitudes/{id}/rechazar:
  *   post:
- *     summary: Rechazar por Director (motivo obligatorio; crea resultado_validacion y elimina usuario/paciente/solicitud)
+ *     summary: Rechazar por Director (motivo obligatorio)
+ *     description: |
+ *       Crea resultado_validacion y elimina usuario/paciente/solicitud.
+ *       
+ *       **REQUIERE:** Rol DIRECTOR_MEDICO
  *     tags: [Validacion]
- *     security: [ { bearerAuth: [] } ]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         schema: { type: string, format: uuid }
+ *         schema:
+ *           type: string
+ *           format: uuid
  *     requestBody:
  *       required: true
  *       content:
@@ -193,25 +206,37 @@ router.post('/solicitudes/:id/aprobar', aprobarDirector); //Poner authToken
  *             type: object
  *             required: [motivo_decision]
  *             properties:
- *               motivo_decision: { type: string }
+ *               motivo_decision:
+ *                 type: string
  *     responses:
  *       '200':
  *         description: Solicitud rechazada y entidades eliminadas
+ *       '401':
+ *         description: No autorizado
+ *       '403':
+ *         description: No es Director Médico
  */
-router.post('/solicitudes/:id/rechazar', rechazarDirector); //Poner authToken
+router.post('/solicitudes/:id/rechazar', requireDirector, rechazarDirector);
 
 /**
  * @openapi
  * /validacion/solicitudes/{id}/devolver:
  *   post:
- *     summary: Devolver al solicitante (motivo obligatorio; deja la solicitud en PENDIENTE y actualiza fechas)
+ *     summary: Devolver al solicitante (motivo obligatorio)
+ *     description: |
+ *       Deja la solicitud en PENDIENTE y actualiza fechas.
+ *       
+ *       **REQUIERE:** Rol DIRECTOR_MEDICO
  *     tags: [Validacion]
- *     security: [ { bearerAuth: [] } ]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         schema: { type: string, format: uuid }
+ *         schema:
+ *           type: string
+ *           format: uuid
  *     requestBody:
  *       required: true
  *       content:
@@ -220,10 +245,16 @@ router.post('/solicitudes/:id/rechazar', rechazarDirector); //Poner authToken
  *             type: object
  *             required: [motivo_decision]
  *             properties:
- *               motivo_decision: { type: string }
+ *               motivo_decision:
+ *                 type: string
  *     responses:
  *       '200':
  *         description: Solicitud devuelta (estado PENDIENTE)
+ *       '401':
+ *         description: No autorizado
+ *       '403':
+ *         description: No es Director Médico
  */
-router.post('/solicitudes/:id/devolver',  devolverDirector) //Poner authToken
+router.post('/solicitudes/:id/devolver', requireDirector, devolverDirector);
+
 export default router;
