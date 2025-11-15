@@ -1,12 +1,20 @@
 import RecomendacionesService from '../services/recomendacionesService.js';
 
 class RecomendacionesController {
+  /**
+   * Obtiene recomendaciones de productos para el paciente autenticado
+   * GET /api/productos/recomendaciones
+   */
   async obtenerRecomendaciones(req, res) {
     try {
-      const { userId } = req.params;
+      // ✅ CAMBIO CRÍTICO: El userId viene de req.params.userId (inyectado por la ruta)
+      const userId = req.params.userId;
 
       if (!userId) {
-        return res.status(400).json({ success: false, error: 'userId es requerido' });
+        return res.status(400).json({ 
+          success: false, 
+          error: 'userId es requerido' 
+        });
       }
 
       const recomendaciones = await RecomendacionesService.obtenerRecomendaciones(userId);
@@ -19,17 +27,28 @@ class RecomendacionesController {
           recomendaciones
         }
       });
+
     } catch (err) {
-      return res.status(500).json({ success: false, error: err.message });
+      return res.status(500).json({ 
+        success: false, 
+        error: err.message 
+      });
     }
   }
 
+  /**
+   * Obtiene productos similares a uno específico
+   * GET /api/productos/:productoId/similares
+   */
   async obtenerProductosSimilares(req, res) {
     try {
       const { productoId } = req.params;
 
       if (!productoId) {
-        return res.status(400).json({ success: false, error: 'productoId es requerido' });
+        return res.status(400).json({ 
+          success: false, 
+          error: 'productoId es requerido' 
+        });
       }
 
       const similares = await RecomendacionesService.obtenerProductosSimilares(productoId);
@@ -42,8 +61,12 @@ class RecomendacionesController {
           similares
         }
       });
+
     } catch (err) {
-      return res.status(500).json({ success: false, error: err.message });
+      return res.status(500).json({ 
+        success: false, 
+        error: err.message 
+      });
     }
   }
 }

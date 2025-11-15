@@ -4,7 +4,7 @@ import logger from '../utils/logger.js';
 
 class ProductosController {
   /**
-   * Consulta el catálogo de productos
+   * Consulta el catálogo de productos (PÚBLICO)
    * GET /api/productos?search=&category=&page=&limit=
    */
   async consultarCatalogo(req, res) {
@@ -27,22 +27,22 @@ class ProductosController {
   }
 
   /**
-   * Procesa una compra de productos
-   * POST /api/productos/comprar
+   * Procesa una compra de productos (SOLO PACIENTES AUTENTICADOS)
+   * POST /api/productos/compra
    * 
    * Body:
    * {
    *   items: [{ productId: "uuid", cantidad: 2 }],
-   *   metodoPago: "TARJETA" | "PASARELA" | "CONSIGNACION"
+   *   metodoPago: "TARJETA" | "PSE" | "CONSIGNACION",
+   *   codigoPromocion: "CODIGO123" (opcional),
+   *   direccion_entrega_id: "uuid"
    * }
-   * 
-   * Headers:
-   * x-paciente-id: "uuid"
    */
   async procesarCompra(req, res) {
     try {
-      const pacienteId = req.pacienteId || req.headers['x-paciente-id'];
-      const { items, metodoPago = 'TARJETA', codigoPromocion = null } = req.body;
+      // ✅ CAMBIO CRÍTICO: El pacienteId viene de req.body.pacienteId (inyectado por la ruta)
+      const pacienteId = req.body.pacienteId;
+      const { items, metodoPago = 'TARJETA', codigoPromocion = null, direccion_entrega_id } = req.body;
 
       if (!pacienteId) {
         return res.status(401).json({ 
@@ -54,13 +54,20 @@ class ProductosController {
       if (!Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ 
           success: false, 
-          error: 'items requeridos' 
+          error: 'items requeridos (debe ser un array con al menos un producto)' 
+        });
+      }
+
+      if (!direccion_entrega_id) {
+        return res.status(400).json({
+          success: false,
+          error: 'direccion_entrega_id es requerido'
         });
       }
 
       logger.info(`🛒 Procesando compra para paciente ${pacienteId} | Items: ${items.length} | Método: ${metodoPago}`);
 
-      let resumen = await productosService.procesarCompra(pacienteId, items, metodoPago);
+      let resumen = await productosService.procesarCompra(pacienteId, items, metodoPago, direccion_entrega_id);
       let montoFinal = resumen.compra.total;
       let descuentoAplicado = 0;
       let promocionData = null;
@@ -134,6 +141,42 @@ class ProductosController {
         success: false, 
         error: error.message, 
         details: error.details || null 
+      });
+    }
+  }
+
+  /**
+   * Obtiene el historial de compras del paciente autenticado
+   * GET /api/productos/mis-compras
+   */
+  async obtenerMisCompras(req, res) {
+    try {
+      const pacienteId = req.query.pacienteId; // Inyectado por la ruta
+
+      if (!pacienteId) {
+        return res.status(401).json({
+          success: false,
+          error: 'Paciente no autenticado'
+        });
+      }
+
+      const { estado, limit = 20, offset = 0 } = req.query;
+
+      const compras = await productosService.obtenerComprasPorPaciente(
+        pacienteId,
+        { estado, limit: parseInt(limit), offset: parseInt(offset) }
+      );
+
+      return res.json({
+        success: true,
+        data: compras
+      });
+
+    } catch (error) {
+      logger.error('❌ ProductosController.obtenerMisCompras error: ' + error.message);
+      return res.status(error.status || 500).json({
+        success: false,
+        error: error.message
       });
     }
   }

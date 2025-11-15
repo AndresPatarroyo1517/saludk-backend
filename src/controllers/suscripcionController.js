@@ -4,30 +4,28 @@ import logger from '../utils/logger.js';
 class SuscripcionController {
   /**
    * Crea una suscripción y genera la orden de pago
-   * POST /api/suscripciones
+   * POST /api/suscripcion
    * 
    * Body:
    * {
    *   planId: "uuid",
-   *   metodoPago: "TARJETA" | "PASARELA" | "CONSIGNACION"
+   *   metodoPago: "TARJETA" | "PSE" | "CONSIGNACION"
    * }
-   * 
-   * Headers:
-   * x-paciente-id: "uuid"
    */
   async crearSuscripcion(req, res) {
     try {
+      // ✅ CAMBIO CRÍTICO: El pacienteId viene de req.body.pacienteId (inyectado por la ruta)
+      const pacienteId = req.body.pacienteId;
       const { planId, metodoPago = 'TARJETA' } = req.body;
-      const pacienteId = req.headers['x-paciente-id'];
 
       if (!pacienteId || !planId) {
         return res.status(400).json({
           success: false,
-          error: 'Debe proporcionar el ID del paciente y el plan.',
+          error: 'Debe proporcionar el plan (planId es requerido).',
         });
       }
 
-      logger.info(`📝 Creando suscripción para paciente ${pacienteId} con plan ${planId} | Método: ${metodoPago}`);
+      logger.info(`📋 Creando suscripción para paciente ${pacienteId} con plan ${planId} | Método: ${metodoPago}`);
 
       const resultado = await SuscripcionService.crearSuscripcion(pacienteId, planId, metodoPago);
 
@@ -72,26 +70,23 @@ class SuscripcionController {
 
   /**
    * Procesa el pago de una suscripción existente
-   * POST /api/suscripciones/procesar-pago
+   * POST /api/suscripcion/pago
    * 
    * Body:
    * {
    *   suscripcionId: "uuid",
-   *   metodoPago: "TARJETA" | "PASARELA" | "CONSIGNACION"
+   *   metodoPago: "TARJETA" | "PSE" | "CONSIGNACION"
    * }
-   * 
-   * Headers:
-   * x-paciente-id: "uuid"
    */
   async procesarPago(req, res) {
     try {
+      const pacienteId = req.body.pacienteId;
       const { suscripcionId, metodoPago = 'TARJETA' } = req.body;
-      const pacienteId = req.headers['x-paciente-id'];
 
       if (!pacienteId || !suscripcionId) {
         return res.status(400).json({
           success: false,
-          error: 'Debe proporcionar el ID del paciente y la suscripción.',
+          error: 'Debe proporcionar el ID de la suscripción.',
         });
       }
 
@@ -117,21 +112,53 @@ class SuscripcionController {
   }
 
   /**
-   * Obtiene el estado de una suscripción
-   * GET /api/suscripciones/:suscripcionId
-   * 
-   * Headers:
-   * x-paciente-id: "uuid"
+   * Obtiene todas las suscripciones del paciente autenticado
+   * GET /api/suscripcion/mis-suscripciones
    */
-  async obtenerSuscripcion(req, res) {
+  async obtenerMisSuscripciones(req, res) {
     try {
-      const { suscripcionId } = req.params;
-      const pacienteId = req.headers['x-paciente-id'];
+      const pacienteId = req.params.pacienteId;
 
       if (!pacienteId) {
         return res.status(400).json({
           success: false,
-          error: 'Debe proporcionar el ID del paciente.',
+          error: 'Paciente no autenticado.',
+        });
+      }
+
+      const suscripciones = await SuscripcionService.obtenerSuscripcionesPorPaciente(pacienteId);
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          pacienteId,
+          total: suscripciones.length,
+          suscripciones
+        }
+      });
+
+    } catch (error) {
+      logger.error(`❌ Error en obtenerMisSuscripciones: ${error.message}`);
+      return res.status(error.status || 500).json({
+        success: false,
+        error: error.message || 'Error interno del servidor.',
+      });
+    }
+  }
+
+  /**
+   * Obtiene el estado de una suscripción específica
+   * GET /api/suscripcion/:suscripcionId
+   */
+  async obtenerSuscripcion(req, res) {
+    try {
+      const { suscripcionId } = req.params;
+      const pacienteId = req.user?.paciente?.id;
+
+      if (!pacienteId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Paciente no autenticado.',
         });
       }
 

@@ -3,14 +3,20 @@ import calificacionService from '../services/calificacionService.js';
 class CalificacionController {
   // ==================== CALIFICACIONES DE MÉDICOS ====================
   
+  /**
+   * Crear calificación de médico (SOLO PACIENTES)
+   * POST /api/calificaciones/medicos
+   */
   async crearCalificacionMedico(req, res) {
     try {
-      const { pacienteId, medicoId, citaId, puntuacion, comentario } = req.body;
+      // ✅ CAMBIO CRÍTICO: El pacienteId viene de req.body.pacienteId (inyectado por la ruta)
+      const pacienteId = req.body.pacienteId;
+      const { medicoId, citaId, puntuacion, comentario } = req.body;
 
       // Validación de campos requeridos
       if (!pacienteId || !medicoId || !citaId || !puntuacion) {
         return res.status(400).json({
-          error: 'Los campos pacienteId, medicoId, citaId y puntuacion son obligatorios'
+          error: 'Los campos medicoId, citaId y puntuacion son obligatorios'
         });
       }
 
@@ -35,10 +41,13 @@ class CalificacionController {
     }
   }
 
+  /**
+   * Obtener calificación por ID (PÚBLICO)
+   * GET /api/calificaciones/medicos/:id
+   */
   async obtenerCalificacionMedicoPorId(req, res) {
     try {
       const { id } = req.params;
-
       const calificacion = await calificacionService.obtenerCalificacionMedicoPorId(id);
 
       return res.status(200).json({
@@ -53,6 +62,10 @@ class CalificacionController {
     }
   }
 
+  /**
+   * Obtener calificaciones de un médico (PÚBLICO)
+   * GET /api/calificaciones/medicos/medico/:medicoId
+   */
   async obtenerCalificacionesPorMedico(req, res) {
     try {
       const { medicoId } = req.params;
@@ -86,10 +99,13 @@ class CalificacionController {
     }
   }
 
+  /**
+   * Obtener estadísticas de médico (PÚBLICO)
+   * GET /api/calificaciones/medicos/medico/:medicoId/estadisticas
+   */
   async obtenerEstadisticasMedico(req, res) {
     try {
       const { medicoId } = req.params;
-
       const estadisticas = await calificacionService.obtenerEstadisticasMedico(medicoId);
 
       return res.status(200).json({
@@ -104,14 +120,19 @@ class CalificacionController {
     }
   }
 
+  /**
+   * Actualizar calificación de médico (SOLO PACIENTE DUEÑO)
+   * PUT /api/calificaciones/medicos/:id
+   */
   async actualizarCalificacionMedico(req, res) {
     try {
       const { id } = req.params;
-      const { pacienteId, puntuacion, comentario } = req.body;
+      const pacienteId = req.body.pacienteId; // Inyectado por la ruta
+      const { puntuacion, comentario } = req.body;
 
       if (!pacienteId) {
-        return res.status(400).json({
-          error: 'El campo pacienteId es obligatorio'
+        return res.status(401).json({
+          error: 'No autenticado'
         });
       }
 
@@ -137,14 +158,18 @@ class CalificacionController {
     }
   }
 
+  /**
+   * Eliminar calificación de médico (SOLO PACIENTE DUEÑO)
+   * DELETE /api/calificaciones/medicos/:id
+   */
   async eliminarCalificacionMedico(req, res) {
     try {
       const { id } = req.params;
-      const { pacienteId } = req.body;
+      const pacienteId = req.body.pacienteId; // Inyectado por la ruta
 
       if (!pacienteId) {
-        return res.status(400).json({
-          error: 'El campo pacienteId es obligatorio'
+        return res.status(401).json({
+          error: 'No autenticado'
         });
       }
 
@@ -162,14 +187,18 @@ class CalificacionController {
 
   // ==================== CALIFICACIONES DE PRODUCTOS ====================
 
+  /**
+   * Crear calificación de producto (SOLO PACIENTES)
+   * POST /api/calificaciones/productos
+   */
   async crearCalificacionProducto(req, res) {
     try {
-      const { pacienteId, productoId, compraId, puntuacion, comentario } = req.body;
+      const pacienteId = req.body.pacienteId;
+      const { productoId, compraId, puntuacion, comentario } = req.body;
 
-      // Validación de campos requeridos
       if (!pacienteId || !productoId || !compraId || !puntuacion) {
         return res.status(400).json({
-          error: 'Los campos pacienteId, productoId, compraId y puntuacion son obligatorios'
+          error: 'Los campos productoId, compraId y puntuacion son obligatorios'
         });
       }
 
@@ -194,10 +223,13 @@ class CalificacionController {
     }
   }
 
+  /**
+   * Obtener calificación de producto por ID (PÚBLICO)
+   * GET /api/calificaciones/productos/:id
+   */
   async obtenerCalificacionProductoPorId(req, res) {
     try {
       const { id } = req.params;
-
       const calificacion = await calificacionService.obtenerCalificacionProductoPorId(id);
 
       return res.status(200).json({
@@ -212,6 +244,10 @@ class CalificacionController {
     }
   }
 
+  /**
+   * Obtener calificaciones de un producto (PÚBLICO)
+   * GET /api/calificaciones/productos/producto/:productoId
+   */
   async obtenerCalificacionesPorProducto(req, res) {
     try {
       const { productoId } = req.params;
@@ -245,10 +281,13 @@ class CalificacionController {
     }
   }
 
+  /**
+   * Obtener estadísticas de producto (PÚBLICO)
+   * GET /api/calificaciones/productos/producto/:productoId/estadisticas
+   */
   async obtenerEstadisticasProducto(req, res) {
     try {
       const { productoId } = req.params;
-
       const estadisticas = await calificacionService.obtenerEstadisticasProducto(productoId);
 
       return res.status(200).json({
@@ -263,14 +302,19 @@ class CalificacionController {
     }
   }
 
+  /**
+   * Actualizar calificación de producto (SOLO PACIENTE DUEÑO)
+   * PUT /api/calificaciones/productos/:id
+   */
   async actualizarCalificacionProducto(req, res) {
     try {
       const { id } = req.params;
-      const { pacienteId, puntuacion, comentario } = req.body;
+      const pacienteId = req.body.pacienteId;
+      const { puntuacion, comentario } = req.body;
 
       if (!pacienteId) {
-        return res.status(400).json({
-          error: 'El campo pacienteId es obligatorio'
+        return res.status(401).json({
+          error: 'No autenticado'
         });
       }
 
@@ -296,14 +340,18 @@ class CalificacionController {
     }
   }
 
+  /**
+   * Eliminar calificación de producto (SOLO PACIENTE DUEÑO)
+   * DELETE /api/calificaciones/productos/:id
+   */
   async eliminarCalificacionProducto(req, res) {
     try {
       const { id } = req.params;
-      const { pacienteId } = req.body;
+      const pacienteId = req.body.pacienteId;
 
       if (!pacienteId) {
-        return res.status(400).json({
-          error: 'El campo pacienteId es obligatorio'
+        return res.status(401).json({
+          error: 'No autenticado'
         });
       }
 
@@ -321,10 +369,20 @@ class CalificacionController {
 
   // ==================== MÉTODOS GENERALES ====================
 
+  /**
+   * Obtener todas las calificaciones del paciente autenticado
+   * GET /api/calificaciones/mis-calificaciones
+   */
   async obtenerCalificacionesPorPaciente(req, res) {
     try {
-      const { pacienteId } = req.params;
+      const pacienteId = req.params.pacienteId;
       const { tipo = 'ambos' } = req.query;
+
+      if (!pacienteId) {
+        return res.status(401).json({
+          error: 'No autenticado'
+        });
+      }
 
       if (!['medicos', 'productos', 'ambos'].includes(tipo)) {
         return res.status(400).json({
