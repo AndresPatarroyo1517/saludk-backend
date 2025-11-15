@@ -59,29 +59,31 @@ class CitaRepository {
    * Verifica si existe conflicto de horario para una nueva cita
    * CORREGIDO: Ahora considera toda la ventana de tiempo, no solo el punto de inicio
    */
-  async verificarConflictoHorario(medicoId, fechaHora, duracionMinutos = 30) {
+  async verificarConflictoHorario(medicoId, fechaHora, duracionMinutos = 30, excludeCitaId = null) {
     const fechaInicio = new Date(fechaHora);
     const fechaFin = new Date(fechaHora.getTime() + duracionMinutos * 60000);
 
     // Buscar cualquier cita que se solape con la ventana [fechaInicio, fechaFin]
-    // Una cita se solapa si:
-    // - Su inicio está dentro de nuestra ventana
-    // - O nuestro inicio está dentro de su ventana (asumiendo duración estándar)
-    const citaConflicto = await this.Cita.findOne({
-      where: {
-        medico_id: medicoId,
-        estado: {
-          [Op.in]: ['AGENDADA', 'CONFIRMADA']
-        },
-        fecha_hora: {
-          // Buscar citas que comienzan en el rango ampliado
-          [Op.between]: [
-            new Date(fechaInicio.getTime() - duracionMinutos * 60000),
-            fechaFin
-          ]
-        }
+    // Si se proporciona excludeCitaId, excluir esa cita (útil al editar)
+    const whereClause = {
+      medico_id: medicoId,
+      estado: {
+        [Op.in]: ['AGENDADA', 'CONFIRMADA']
+      },
+      fecha_hora: {
+        // Buscar citas que comienzan en el rango ampliado
+        [Op.between]: [
+          new Date(fechaInicio.getTime() - duracionMinutos * 60000),
+          fechaFin
+        ]
       }
-    });
+    };
+
+    if (excludeCitaId) {
+      whereClause.id = { [Op.ne]: excludeCitaId };
+    }
+
+    const citaConflicto = await this.Cita.findOne({ where: whereClause });
 
     return citaConflicto !== null;
   }
@@ -158,7 +160,7 @@ class CitaRepository {
   }
 
   /**
-   * Actualiza una cita existente
+   * Actualiza una cita existente y retorna los datos completos
    */
   async actualizarCita(citaId, datosActualizados) {
     const cita = await this.Cita.findByPk(citaId);
@@ -167,7 +169,17 @@ class CitaRepository {
       throw new Error('Cita no encontrada');
     }
 
-    const citaActualizada = await cita.update(datosActualizados);
+    // Actualizar la cita
+    await cita.update(datosActualizados);
+
+    // Retornar la cita actualizada con todos los campos
+    const citaActualizada = await this.Cita.findByPk(citaId, {
+      include: [
+        { model: db.Medico, as: 'medico', attributes: ['id', 'nombres', 'apellidos', 'especialidad'] },
+        { model: db.Paciente, as: 'paciente', attributes: ['id', 'nombres', 'apellidos', 'email'] }
+      ]
+    });
+
     return citaActualizada.toJSON ? citaActualizada.toJSON() : citaActualizada;
   }
 

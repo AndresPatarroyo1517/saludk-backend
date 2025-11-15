@@ -1,4 +1,6 @@
 import CitaService from '../services/citasService.js';
+import logger from '../utils/logger.js';
+import db from '../models/index.js';
 
 class CitaController {
   constructor() {
@@ -81,7 +83,7 @@ class CitaController {
       });
 
     } catch (error) {
-      console.error('Error al obtener disponibilidad: - citasController.js:84', error);
+      console.error('Error al obtener disponibilidad: - citasController.js:85', error);
       
       if (error.message === 'Médico no encontrado') {
         return res.status(404).json({
@@ -133,7 +135,7 @@ class CitaController {
       });
 
     } catch (error) {
-      console.error('Error al validar slot: - citasController.js:136', error);
+      console.error('Error al validar slot: - citasController.js:137', error);
       res.status(500).json({
         error: 'Error al validar disponibilidad',
         mensaje: error.message
@@ -186,7 +188,7 @@ class CitaController {
       });
 
     } catch (error) {
-      console.error('Error al obtener próximos slots: - citasController.js:189', error);
+      console.error('Error al obtener próximos slots: - citasController.js:190', error);
       
       if (error.message === 'Médico no encontrado') {
         return res.status(404).json({
@@ -256,7 +258,7 @@ class CitaController {
       });
 
     } catch (error) {
-      console.error('Error al crear cita: - citasController.js:259', error);
+      console.error('Error al crear cita: - citasController.js:260', error);
 
       if (error.message.includes('no encontrado')) {
         return res.status(404).json({ error: error.message });
@@ -278,15 +280,32 @@ class CitaController {
   /**
    * GET /citas/paciente/:pacienteId
    * Obtiene todas las citas de un paciente con filtros opcionales
+   * NOTA: Acepta paciente_id o usuario_id y mapea automáticamente
    */
   obtenerCitasPaciente = async (req, res) => {
     try {
-      const { pacienteId } = req.params;
+      let { pacienteId } = req.params;
       const { estado, fecha_desde, fecha_hasta, modalidad, ordenar_por } = req.query;
 
       if (!pacienteId) {
         return res.status(400).json({
           error: 'El parámetro pacienteId es requerido'
+        });
+      }
+
+      // Mapear usuario_id a paciente_id si es necesario
+      let paciente = await db.Paciente.findByPk(pacienteId);
+      if (!paciente) {
+        // Intentar buscar por usuario_id
+        paciente = await db.Paciente.findOne({ where: { usuario_id: pacienteId } });
+        if (paciente) {
+          pacienteId = paciente.id;
+        }
+      }
+
+      if (!paciente) {
+        return res.status(404).json({
+          error: 'Paciente no encontrado'
         });
       }
 
@@ -310,9 +329,78 @@ class CitaController {
       });
 
     } catch (error) {
-      console.error('Error al obtener citas del paciente: - citasController.js:313', error);
+      logger.error('Error al obtener citas del paciente: citasController.js - ' + error.message);
       res.status(500).json({
         error: 'Error al obtener las citas del paciente',
+        mensaje: error.message
+      });
+    }
+  };
+
+  /**
+   * PUT /citas/:citaId
+   * Edita una cita existente - acepta CUALQUIER campo editable
+   * Body: { fecha_hora?, modalidad?, motivo_consulta?, notas_consulta?, enlace_virtual?, ... }
+   * IMPORTANTE: JSON debe estar correctamente formado con COMILLAS DOBLES
+   */
+  editarCita = async (req, res) => {
+    try {
+      const { citaId } = req.params;
+      const datosActualizacion = req.body;
+
+      if (!citaId) {
+        return res.status(400).json({
+          error: 'El parámetro citaId es requerido'
+        });
+      }
+
+      if (!datosActualizacion || Object.keys(datosActualizacion).length === 0) {
+        return res.status(400).json({
+          error: 'Debe proporcionar al menos un campo para actualizar',
+          ejemplo: {
+            "fecha_hora": "2025-11-20T14:30:00Z",
+            "modalidad": "VIRTUAL",
+            "motivo_consulta": "Consulta de seguimiento",
+            "notas_consulta": "Paciente con alergia a penicilina"
+          },
+          nota: "Asegúrese de usar COMILLAS DOBLES en todas las propiedades y valores de JSON"
+        });
+      }
+
+      const citaActualizada = await this.service.editarCita(citaId, datosActualizacion);
+
+      res.status(200).json({
+        success: true,
+        mensaje: 'Cita actualizada exitosamente',
+        data: citaActualizada
+      });
+
+    } catch (error) {
+      logger.error('Error al editar cita: citasController.js - ' + error.message);
+
+      if (error.message === 'Cita no encontrada') {
+        return res.status(404).json({
+          error: error.message
+        });
+      }
+
+      if (error.message.includes('No se puede editar') || 
+          error.message.includes('No se puede agendar') ||
+          error.message.includes('No hay campos válidos') ||
+          error.message.includes('debe ser una fecha válida')) {
+        return res.status(400).json({
+          error: error.message
+        });
+      }
+
+      if (error.message.includes('no está disponible')) {
+        return res.status(409).json({
+          error: error.message
+        });
+      }
+
+      res.status(500).json({
+        error: 'Error al actualizar la cita',
         mensaje: error.message
       });
     }
@@ -333,6 +421,33 @@ class CitaController {
         });
       }
 
+      // AUTHORIZATION: permitir solo al paciente dueño, al médico asociado o a admins
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ error: 'No autenticado' });
+      }
+
+      // Cargar cita con relaciones necesarias
+      const cita = await db.Cita.findByPk(citaId, {
+        include: [
+          { association: 'paciente', include: [{ association: 'usuario' }] },
+          { association: 'medico', include: [{ association: 'usuario' }] }
+        ]
+      });
+
+      if (!cita) {
+        return res.status(404).json({ error: 'Cita no encontrada' });
+      }
+
+      const usuarioId = user.userId;
+      const esAdmin = user.rol === 'ADMIN';
+      const esPacientePropietario = cita.paciente && cita.paciente.usuario && cita.paciente.usuario.id === usuarioId;
+      const esMedicoAsociado = cita.medico && cita.medico.usuario && cita.medico.usuario.id === usuarioId;
+
+      if (!esAdmin && !esPacientePropietario && !esMedicoAsociado) {
+        return res.status(403).json({ error: 'No tiene permisos para cancelar esta cita' });
+      }
+
       const citaCancelada = await this.service.cancelarCita(citaId, motivo_cancelacion);
 
       res.status(200).json({
@@ -342,7 +457,7 @@ class CitaController {
       });
 
     } catch (error) {
-      console.error('Error al cancelar cita: - citasController.js:345', error);
+      console.error('Error al cancelar cita: - citasController.js:415', error);
 
       if (error.message === 'Cita no encontrada') {
         return res.status(404).json({

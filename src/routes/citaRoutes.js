@@ -1,5 +1,6 @@
 import express from 'express';
 import CitaController from '../controllers/citasController.js';
+import { authMiddleware } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 const controller = new CitaController();
@@ -887,6 +888,207 @@ router.get('/paciente/:pacienteId', controller.obtenerCitasPaciente);
  *               properties:
  *                 error:
  *                   type: string
+/**
+ * @swagger
+ * /citas/{citaId}:
+ *   put:
+ *     summary: Editar una cita existente
+ *     description: Permite editar los detalles de una cita (fecha/hora, modalidad, motivo, notas). Solo se pueden editar citas en estado AGENDADA o CONFIRMADA.
+ *     tags: [Citas]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: citaId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: UUID de la cita a editar
+ *         example: 123e4567-e89b-12d3-a456-426614174000
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               fecha_hora:
+ *                 type: string
+ *                 format: date-time
+ *                 description: Nueva fecha y hora de la cita (ISO 8601)
+ *                 example: "2025-11-20T14:30:00Z"
+ *               modalidad:
+ *                 type: string
+ *                 enum: [PRESENCIAL, VIRTUAL]
+ *                 description: Modalidad de la cita
+ *                 example: "VIRTUAL"
+ *               motivo_consulta:
+ *                 type: string
+ *                 description: Motivo de la consulta
+ *                 example: "Dolor en el brazo izquierdo"
+ *               notas_consulta:
+ *                 type: string
+ *                 description: Notas adicionales sobre la cita
+ *                 example: "Paciente con alergia a penicilina"
+ *     responses:
+ *       200:
+ *         description: Cita actualizada exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 mensaje:
+ *                   type: string
+ *                   example: "Cita actualizada exitosamente"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                     paciente_id:
+ *                       type: string
+ *                       format: uuid
+ *                     medico_id:
+ *                       type: string
+ *                       format: uuid
+ *                     fecha_hora:
+ *                       type: string
+ *                       format: date-time
+ *                     modalidad:
+ *                       type: string
+ *                       enum: [PRESENCIAL, VIRTUAL]
+ *                     estado:
+ *                       type: string
+ *                       enum: [AGENDADA, CONFIRMADA, COMPLETADA, CANCELADA]
+ *                     motivo_consulta:
+ *                       type: string
+ *                     notas_consulta:
+ *                       type: string
+ *       400:
+ *         description: Solicitud inválida
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *             examples:
+ *               sinCampos:
+ *                 summary: Sin campos para actualizar
+ *                 value:
+ *                   error: "Debe proporcionar al menos un campo para actualizar"
+ *                   camposPermitidos: ["fecha_hora", "modalidad", "motivo_consulta", "notas_consulta"]
+ *               estadoInvalido:
+ *                 summary: Cita en estado no editable
+ *                 value:
+ *                   error: "No se puede editar una cita en estado COMPLETADA"
+ *               sinAnticipacion:
+ *                 summary: Sin 24 horas de anticipación
+ *                 value:
+ *                   error: "No se puede agendar o cambiar una cita con menos de 24 horas de anticipación"
+ *       404:
+ *         description: Cita no encontrada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Cita no encontrada"
+ *       409:
+ *         description: Conflicto - Horario no disponible
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "El horario seleccionado no está disponible para el médico"
+ *       500:
+ *         description: Error interno del servidor
+ */
+router.put('/:citaId', controller.editarCita);
+
+/**
+ * @swagger
+ * /citas/{citaId}/cancelar:
+ *   delete:
+ *     summary: Cancelar una cita
+ *     description: Permite cancelar una cita existente. Solo se pueden cancelar citas en estado AGENDADA o CONFIRMADA con al menos 24 horas de anticipación.
+ *     tags: [Citas]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: citaId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: UUID de la cita a cancelar
+ *         example: 123e4567-e89b-12d3-a456-426614174000
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               motivo_cancelacion:
+ *                 type: string
+ *                 description: Motivo de la cancelación (opcional)
+ *                 example: "No puedo asistir"
+ *     responses:
+ *       200:
+ *         description: Cita cancelada exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 mensaje:
+ *                   type: string
+ *                   example: "Cita cancelada exitosamente"
+ *                 data:
+ *                   type: object
+ *       400:
+ *         description: No se puede cancelar la cita
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *             examples:
+ *               estadoInvalido:
+ *                 summary: Estado no permitido
+ *                 value:
+ *                   error: "No se puede cancelar una cita en estado COMPLETADA"
+ *               sinAnticipacion:
+ *                 summary: Menos de 24 horas
+ *                 value:
+ *                   error: "No se puede cancelar una cita con menos de 24 horas de anticipación"
+ *       404:
+ *         description: Cita no encontrada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
  *                   example: "Cita no encontrada"
  *       500:
  *         description: Error interno del servidor
@@ -899,6 +1101,6 @@ router.get('/paciente/:pacienteId', controller.obtenerCitasPaciente);
  *                   type: string
  *                   example: "Error al cancelar la cita"
  */
-router.delete('/:citaId/cancelar', controller.cancelarCita);
+router.delete('/:citaId/cancelar', authMiddleware, controller.cancelarCita);
 
 export default router;

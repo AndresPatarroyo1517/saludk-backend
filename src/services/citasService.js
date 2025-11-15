@@ -161,7 +161,7 @@ class CitaService {
    * Valida si un slot específico está disponible para agendar
    * CORREGIDO: Ahora valida que el slot completo quepa en el horario disponible
    */
-  async validarSlotDisponible(medicoId, fechaHora, duracionMinutos = 30) {
+  async validarSlotDisponible(medicoId, fechaHora, duracionMinutos = 30, excludeCitaId = null) {
     const fecha = new Date(fechaHora);
     
     if (fecha <= new Date()) {
@@ -197,9 +197,10 @@ class CitaService {
     }
 
     const hayConflicto = await this.repository.verificarConflictoHorario(
-      medicoId, 
-      fecha, 
-      duracionMinutos
+      medicoId,
+      fecha,
+      duracionMinutos,
+      excludeCitaId
     );
 
     if (hayConflicto) {
@@ -220,14 +221,14 @@ class CitaService {
    * CORREGIDO: Eliminada duplicación, un solo método
    */
   async crearCita(datosCita) {
-    const { 
-      medico_id, 
-      paciente_id, 
-      fecha_hora, 
-      modalidad, 
-      motivo_consulta, 
-      duracion_minutos = this.DURACION_ESTANDAR 
+    const {
+      medico_id,
+      fecha_hora,
+      modalidad,
+      motivo_consulta,
+      duracion_minutos = this.DURACION_ESTANDAR
     } = datosCita;
+    let paciente_id = datosCita.paciente_id;
 
     // Validaciones
     if (!medico_id || !paciente_id || !fecha_hora || !modalidad) {
@@ -241,6 +242,22 @@ class CitaService {
     const medico = await this.repository.obtenerMedicoPorId(medico_id);
     if (!medico) {
       throw new Error('Médico no encontrado');
+    }
+
+    // Validar y mapear paciente_id: permitir que el cliente envíe el `paciente.id`
+    // o, por conveniencia, el `usuario.id` asociado al paciente (caso frontend)
+    let pacienteRecord = await db.Paciente.findByPk(paciente_id);
+    if (!pacienteRecord) {
+      // Intentar mapear si el frontend envía el usuario.id en lugar del paciente.id
+      pacienteRecord = await db.Paciente.findOne({ where: { usuario_id: paciente_id } });
+      if (pacienteRecord) {
+        // Reemplazar paciente_id por el id real del paciente
+        paciente_id = pacienteRecord.id;
+      }
+    }
+
+    if (!pacienteRecord) {
+      throw new Error('Paciente no encontrado');
     }
 
     const fechaCita = new Date(fecha_hora);
@@ -416,6 +433,97 @@ class CitaService {
       paciente_id: citaCancelada.paciente_id,
       mensaje: 'Cita cancelada exitosamente'
     };
+  }
+
+  /**
+   * Edita una cita existente - acepta CUALQUIER campo editable
+   * Campos protegidos (no editables): id, paciente_id, medico_id, estado, fecha_creacion, fecha_actualizacion
+   * Valida disponibilidad solo si se cambia fecha_hora
+   */
+  async editarCita(citaId, datosActualizacion) {
+    const cita = await this.repository.obtenerCitaPorId(citaId);
+
+    if (!cita) {
+      throw new Error('Cita no encontrada');
+    }
+
+    // Validar que la cita pueda ser editada (solo en estados AGENDADA o CONFIRMADA)
+    if (!['AGENDADA', 'CONFIRMADA'].includes(cita.estado)) {
+      throw new Error(
+        `No se puede editar una cita en estado ${cita.estado}. ` +
+        `Solo se pueden editar citas en estado AGENDADA o CONFIRMADA`
+      );
+    }
+
+    // Campos no editables (protegidos)
+    const camposProtegidos = ['id', 'paciente_id', 'medico_id', 'estado', 'fecha_creacion', 'fecha_actualizacion'];
+    
+    // Preparar datos a actualizar (excluir campos protegidos)
+    const actualizacion = {};
+    
+    for (const [key, value] of Object.entries(datosActualizacion)) {
+      if (!camposProtegidos.includes(key) && value !== undefined) {
+        actualizacion[key] = value;
+      }
+    }
+
+    // Si se cambia fecha/hora, validar disponibilidad y anticipación
+    if (actualizacion.fecha_hora) {
+      const nuevaFecha = new Date(actualizacion.fecha_hora);
+
+      // Validar que sea una fecha válida
+      if (isNaN(nuevaFecha.getTime())) {
+        throw new Error('La fecha_hora debe ser una fecha válida en formato ISO 8601');
+      }
+
+      // Validar que no sea en el pasado (24 horas de anticipación)
+      const ahora = new Date();
+      const veinticuatroHoras = 24 * 60 * 60 * 1000;
+
+      if (nuevaFecha.getTime() - ahora.getTime() < veinticuatroHoras) {
+        throw new Error(
+          'No se puede agendar o cambiar una cita con menos de 24 horas de anticipación'
+        );
+      }
+
+      // Validar que el slot esté disponible (excluyendo la cita actual)
+      const duracionCita = 30; // Duración estándar
+      const validacion = await this.validarSlotDisponible(
+        cita.medico_id,
+        nuevaFecha,
+        duracionCita,
+        citaId // Excluir la cita actual de la validación
+      );
+
+      if (!validacion.disponible) {
+        throw new Error(`El horario seleccionado no está disponible para el médico: ${validacion.motivo || ''}`);
+      }
+    }
+
+    // Si se cambia a modalidad VIRTUAL y no tiene enlace, generar uno
+    if (actualizacion.modalidad === 'VIRTUAL' && !cita.enlace_virtual) {
+      actualizacion.enlace_virtual = this._generarEnlaceVirtual();
+    }
+
+    // Validar que hay al menos un campo a actualizar
+    if (Object.keys(actualizacion).length === 0) {
+      throw new Error('No hay campos válidos para actualizar');
+    }
+
+    // Actualizar la cita
+    const citaActualizada = await this.repository.actualizarCita(citaId, actualizacion);
+
+    logger.info(`✅ Cita ${citaId} actualizada exitosamente`);
+
+    // Enviar notificación al paciente
+    try {
+      await notificationService.notificarCambiosCita(cita.paciente_id, citaActualizada);
+    } catch (error) {
+      logger.error('Error enviando notificación de cambio de cita: ' + error.message);
+      // No lanzar error, solo loguear
+    }
+
+    return citaActualizada;
   }
 
   /**

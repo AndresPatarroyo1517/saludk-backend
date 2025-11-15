@@ -60,7 +60,6 @@ const PromocionPaciente = promocionPacienteModel(sequelize, Sequelize.DataTypes)
 const OrdenPago = ordenPagoModel(sequelize, Sequelize.DataTypes);
 const Notificacion = notificacionModel(sequelize, Sequelize.DataTypes);
 const Auditoria = auditoriaModel(sequelize, Sequelize.DataTypes);
-
 // ============================================
 // DEFINIR ASOCIACIONES (RELACIONES)
 // ============================================
