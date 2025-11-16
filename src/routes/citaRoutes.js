@@ -927,10 +927,6 @@ router.get('/paciente/:pacienteId', controller.obtenerCitasPaciente);
  *                 type: string
  *                 description: Motivo de la consulta
  *                 example: "Dolor en el brazo izquierdo"
- *               notas_consulta:
- *                 type: string
- *                 description: Notas adicionales sobre la cita
- *                 example: "Paciente con alergia a penicilina"
  *     responses:
  *       200:
  *         description: Cita actualizada exitosamente
@@ -1016,7 +1012,7 @@ router.get('/paciente/:pacienteId', controller.obtenerCitasPaciente);
  *       500:
  *         description: Error interno del servidor
  */
-router.put('/:citaId', controller.editarCita);
+router.put('/:citaId', authMiddleware, controller.editarCita);
 
 /**
  * @swagger
