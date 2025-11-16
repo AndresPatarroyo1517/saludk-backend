@@ -3,61 +3,46 @@ import logger from '../utils/logger.js';
 
 class SuscripcionController {
   /**
-   * Crea una suscripción y genera la orden de pago
+   * ✅ PASO 1: Crea una suscripción y genera la orden de pago pendiente
    * POST /api/suscripcion
    * 
    * Body:
    * {
-   *   planId: "uuid",
-   *   metodoPago: "TARJETA" | "PSE" | "CONSIGNACION"
+   *   planId: "uuid"
+   * }
+   * 
+   * Response:
+   * {
+   *   success: true,
+   *   message: "Suscripción creada correctamente.",
+   *   data: {
+   *     suscripcion: { ... },
+   *     ordenPago: { id, estado, monto }
+   *   }
    * }
    */
   async crearSuscripcion(req, res) {
     try {
-      // ✅ CAMBIO CRÍTICO: El pacienteId viene de req.body.pacienteId (inyectado por la ruta)
-      const pacienteId = req.body.pacienteId;
-      const { planId, metodoPago = 'TARJETA' } = req.body;
+      const pacienteId = req.body.pacienteId; // Inyectado por middleware
+      const { planId } = req.body;
+      const metodoPago = req.body.metodoPago;
 
       if (!pacienteId || !planId) {
         return res.status(400).json({
           success: false,
-          error: 'Debe proporcionar el plan (planId es requerido).',
+          error: 'El planId es requerido.',
         });
       }
 
-      logger.info(`📋 Creando suscripción para paciente ${pacienteId} con plan ${planId} | Método: ${metodoPago}`);
+      logger.info(`📋 Creando suscripción para paciente ${pacienteId} con plan ${planId}`);
 
       const resultado = await SuscripcionService.crearSuscripcion(pacienteId, planId, metodoPago);
 
-      // Respuesta adaptada según método de pago
-      const response = {
+      return res.status(201).json({
         success: true,
-        message: 'Suscripción creada correctamente.',
-        data: {
-          suscripcion: resultado.suscripcion,
-          ordenPago: resultado.ordenPago
-        }
-      };
-
-      // Para TARJETA: incluir clientSecret para Stripe Elements
-      if (resultado.stripe) {
-        response.data.stripe = resultado.stripe;
-        response.message = 'Suscripción creada. Procede con el pago usando el clientSecret.';
-      }
-
-      // Para PSE: incluir referencia
-      if (resultado.pse) {
-        response.data.pse = resultado.pse;
-        response.message = 'Suscripción creada. ' + resultado.pse.mensaje;
-      }
-
-      // Para CONSIGNACION: incluir instrucciones
-      if (resultado.consignacion) {
-        response.data.consignacion = resultado.consignacion;
-        response.message = 'Suscripción creada. Realiza la consignación con los datos proporcionados.';
-      }
-
-      return res.status(201).json(response);
+        message: 'Suscripción creada correctamente. Elige un método de pago para continuar.',
+        data: resultado
+      });
 
     } catch (error) {
       logger.error(`❌ Error en crearSuscripcion: ${error.message}`);
@@ -69,38 +54,103 @@ class SuscripcionController {
   }
 
   /**
-   * Procesa el pago de una suscripción existente
+   * ✅ PASO 2: Procesa el pago de una suscripción existente
    * POST /api/suscripcion/pago
    * 
    * Body:
    * {
    *   suscripcionId: "uuid",
-   *   metodoPago: "TARJETA" | "PSE" | "CONSIGNACION"
+   *   metodoPago: "TARJETA" | "PASARELA" | "CONSIGNACION"
+   * }
+   * 
+   * Response para TARJETA:
+   * {
+   *   success: true,
+   *   data: {
+   *     ordenPago: { ... },
+   *     stripe: {
+   *       clientSecret: "pi_xxx_secret_xxx",
+   *       paymentIntentId: "pi_xxx",
+   *       status: "requires_payment_method",
+   *       amount_usd: 25.50,
+   *       amount_cop: 100000
+   *     }
+   *   }
+   * }
+   * 
+   * Response para PASARELA (PSE):
+   * {
+   *   success: true,
+   *   data: {
+   *     ordenPago: { ... },
+   *     pse: {
+   *       referencia: "PSE-xxx-123456",
+   *       mensaje: "Procede con el pago..."
+   *     }
+   *   }
+   * }
+   * 
+   * Response para CONSIGNACION:
+   * {
+   *   success: true,
+   *   data: {
+   *     ordenPago: { ... },
+   *     consignacion: {
+   *       referencia: "CONS-xxx",
+   *       banco: "Banco XYZ",
+   *       numero_cuenta: "1234567890",
+   *       titular: "Tu Empresa SAS",
+   *       monto: 100000,
+   *       instrucciones: "..."
+   *     }
+   *   }
    * }
    */
   async procesarPago(req, res) {
     try {
-      const pacienteId = req.body.pacienteId;
+      const pacienteId = req.body.pacienteId; // Inyectado por middleware
       const { suscripcionId, metodoPago = 'TARJETA' } = req.body;
 
       if (!pacienteId || !suscripcionId) {
         return res.status(400).json({
           success: false,
-          error: 'Debe proporcionar el ID de la suscripción.',
+          error: 'El suscripcionId es requerido.',
+        });
+      }
+
+      // Validar método de pago
+      const metodosValidos = ['TARJETA_CREDITO', 'TARJETA_DEBITO', 'PASARELA', 'CONSIGNACION'];
+      if (!metodosValidos.includes(metodoPago)) {
+        return res.status(400).json({
+          success: false,
+          error: `Método de pago inválido. Usa: ${metodosValidos.join(', ')}`,
         });
       }
 
       logger.info(`💳 Procesando pago de suscripción ${suscripcionId} con método ${metodoPago}`);
 
-      const resultado = await SuscripcionService.procesarPago(pacienteId, suscripcionId, metodoPago);
+      const resultado = await SuscripcionService.procesarPago(
+        pacienteId, 
+        suscripcionId, 
+        metodoPago
+      );
 
-      const response = {
+      // Mensajes personalizados según método de pago
+      let message = 'Pago procesado correctamente.';
+      
+      if (metodoPago === 'TARJETA_CREDITO' || metodoPago === 'TARJETA_DEBITO') {
+        message = 'Orden lista. Completa el pago con tu tarjeta usando el clientSecret.';
+      } else if (metodoPago === 'PASARELA') {
+        message = 'Referencia PSE generada. Procede con el pago en tu banco.';
+      } else if (metodoPago === 'CONSIGNACION') {
+        message = 'Instrucciones de consignación generadas. Realiza la transferencia.';
+      }
+
+      return res.status(200).json({
         success: true,
-        message: 'Pago procesado correctamente.',
+        message,
         data: resultado
-      };
-
-      return res.status(200).json(response);
+      });
 
     } catch (error) {
       logger.error(`❌ Error en procesarPago: ${error.message}`);
@@ -153,7 +203,7 @@ class SuscripcionController {
   async obtenerSuscripcion(req, res) {
     try {
       const { suscripcionId } = req.params;
-      const pacienteId = req.user?.paciente?.id;
+      const pacienteId = req.body.pacienteId; // Inyectado por middleware
 
       if (!pacienteId) {
         return res.status(400).json({

@@ -1,6 +1,7 @@
 import loginService from "../services/loginService.js";
 import { setAuthCookies, clearAuthCookies } from "../middlewares/authMiddleware.js";
 import { Usuario, Paciente, Direccion } from "../models/index.js";
+import userService from "../services/userService.js";
 
 class LoginController {
   /**
@@ -150,7 +151,7 @@ class LoginController {
    */
   async me(req, res) {
     try {
-      if (!req.user) {
+      if (!req.user?.userId) {
         return res.status(401).json({
           success: false,
           message: "No autenticado",
@@ -159,80 +160,21 @@ class LoginController {
       }
 
       const { userId } = req.user;
+      
+      const result = await userService.getUserProfile(userId);
 
-      // Busca el usuario con datos relacionados
-      const usuario = await Usuario.findByPk(userId, {
-        attributes: ['id', 'email', 'rol', 'activo'],
-        include: [
-          {
-            model: Paciente,
-            as: 'paciente',
-            attributes: [
-              'id',
-              'nombres',
-              'apellidos',
-              'fecha_nacimiento',
-              'telefono',
-              'genero',
-              'tipo_identificacion',
-              'numero_identificacion'
-            ],
-            required: false, // LEFT JOIN en vez de INNER JOIN
-            include: [
-              {
-                model: Direccion,
-                as: 'direcciones',
-                attributes: [
-                  'id',
-                  'direccion_completa',
-                  'ciudad',
-                  'departamento',
-                  'tipo'
-                ],
-                required: false
-              }
-            ]
-          }
-        ]
-      });
-
-      if (!usuario) {
-        // Usuario no existe pero tiene token válido = inconsistencia
-        clearAuthCookies(res);
-        return res.status(404).json({
-          success: false,
-          message: "Usuario no encontrado",
-          code: "USER_NOT_FOUND"
-        });
-      }
-
-      // Verificar si cuenta está activa
-      if (!usuario.activo) {
-        clearAuthCookies(res);
-        return res.status(403).json({
-          success: false,
-          message: "Cuenta desactivada",
-          code: "ACCOUNT_DISABLED"
-        });
-      }
-
-      res.status(200).json({
-        success: true,
-        usuario: {
-          id: usuario.id,
-          email: usuario.email,
-          rol: usuario.rol.toLowerCase(),
-          activo: usuario.activo,
-          datos_personales: usuario.paciente || null
-        }
-      });
+      return res.status(200).json(result);
 
     } catch (error) {
       console.error(`[ME ERROR] User: ${req.user?.userId} | Error:`, error);
-      res.status(500).json({
+
+      const status = error.status || 500;
+      const code = error.code || "INTERNAL_ERROR";
+
+      return res.status(status).json({
         success: false,
-        message: "Error al obtener datos del usuario",
-        code: "INTERNAL_ERROR"
+        message: error.message || "Error al obtener datos del usuario",
+        code
       });
     }
   }

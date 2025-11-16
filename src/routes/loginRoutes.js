@@ -24,10 +24,10 @@ const router = express.Router();
  *             properties:
  *               email:
  *                 type: string
- *                 example: admin@example.com
+ *                 example: andresp@gmail.com
  *               password:
  *                 type: string
- *                 example: "123456"
+ *                 example: "Andres1565?"
  *               rememberMe:
  *                 type: boolean
  *                 example: true
