@@ -104,7 +104,7 @@ app.get('/health', (req, res) => {
 
 app.get('/ready', async (req, res) => {
   try {
-    const dbModule = await import('../database/database.js');
+    const dbModule = await import('./database/database.js');
     const { sequelize } = dbModule;
 
     const redisModule = await import('./config/redisClient.js');
@@ -143,25 +143,39 @@ app.get('/api/docs.json', (req, res) => {
 
 if (process.env.NODE_ENV === 'development') {
   try {
-    const jobsModule = await import('./jobs.js');
-    const queues = jobsModule.default || jobsModule;
+      const jobsModule = await import('./jobs/index.js').catch(() => null);
+      if (jobsModule) {
+        const queues = jobsModule.default || jobsModule;
 
-    const serverAdapter = new ExpressAdapter();
-    serverAdapter.setBasePath('/admin/queues');
+        const serverAdapter = new ExpressAdapter();
+        serverAdapter.setBasePath('/admin/queues');
 
-    createBullBoard({
-      queues: Object.values(queues).map(queue => new BullAdapter(queue)),
-      serverAdapter: serverAdapter,
-    });
+        createBullBoard({
+          queues: Object.values(queues).map(queue => new BullAdapter(queue)),
+          serverAdapter: serverAdapter,
+        });
 
-    app.use('/admin/queues', serverAdapter.getRouter());
-    logger.info('📊 Bull Board available at /admin/queues');
+        app.use('/admin/queues', serverAdapter.getRouter());
+        logger.info('📊 Bull Board available at /admin/queues');
+      }
   } catch (error) {
     logger.warn('Bull Board not initialized:', error.message);
   }
-}else{
-  limpiezaDocumentosJob.iniciar();
-}
+    // (Debug routes removed)
+  } else {
+    try {
+      const limpiezaModule = await import('./jobs/limpiezaDocumentosJob.js').catch(() => null);
+      const limpieza = limpiezaModule && (limpiezaModule.default || limpiezaModule);
+      if (limpieza && typeof limpieza.iniciar === 'function') {
+        limpieza.iniciar();
+        logger.info('LimpiezaDocumentosJob iniciada en entorno no-development');
+      } else {
+        logger.info('LimpiezaDocumentosJob no encontrada o no iniciable en este entorno');
+      }
+    } catch (err) {
+      logger.warn('No se pudo iniciar limpiezaDocumentosJob:', err.message);
+    }
+  }
 
 //app.use('/api/v1', routes);
 
@@ -269,6 +283,7 @@ app.use('/calificaciones', calificacionRoutes);
 app.use('/metricas', kpiRoutes);
 app.use('/promociones', PromocionesRoutes);
 app.use('/historialMedico', historialMedicoRoutes);
+
 
 
 export default app;

@@ -39,12 +39,26 @@ class CitaRepository {
   /**
    * Obtiene las citas agendadas de un médico en un rango de fechas
    */
-  async obtenerCitasAgendadas(medicoId, fechaInicio, fechaFin, estados = ['AGENDADA', 'CONFIRMADA']) {
+  async obtenerCitasAgendadas(medicoId, fechaInicio, fechaFin, estados = ['AGENDADA', 'CONFIRMADA'], duracionMinutos = 30) {
+    // Normalizar rango: cubrir desde inicio del día de fechaInicio
+    // hasta fin del día de fechaFin y añadir un margen por la duración
+    // para capturar citas que empiecen ligeramente fuera del rango pero
+    // que se solapen con los slots.
+    const inicio = new Date(fechaInicio);
+    inicio.setHours(0, 0, 0, 0);
+    const fin = new Date(fechaFin);
+    fin.setHours(23, 59, 59, 999);
+
+    // Añadir margen por duración en milisegundos
+    const margen = (duracionMinutos || 30) * 60 * 1000;
+    const inicioConMargen = new Date(inicio.getTime() - margen);
+    const finConMargen = new Date(fin.getTime() + margen);
+
     return await this.Cita.findAll({
       where: {
         medico_id: medicoId,
         fecha_hora: {
-          [Op.between]: [fechaInicio, fechaFin]
+          [Op.between]: [inicioConMargen, finConMargen]
         },
         estado: {
           [Op.in]: estados

@@ -11,6 +11,42 @@ class CitaService {
   }
 
   /**
+   * Normaliza una fecha de entrada (string o Date) a un Date en UTC.
+   * - Si la entrada tiene un indicador de zona (Z o ±hh:mm) se respeta y
+   *   se construye la Date correspondiente.
+   * - Si la entrada NO tiene zona, se interpreta como hora local del cliente
+   *   y se convierte a UTC manteniendo la hora "wall-clock" indicada.
+   */
+  _parseInputDateToUTC(input) {
+    if (!input) return null;
+    let d;
+    if (input instanceof Date) {
+      d = input;
+    } else {
+      // string
+      const s = String(input);
+      // detecta si contiene Z o un offset +HH or -HH
+      const hasZone = /Z$|[+-]\d{2}:?\d{2}$/i.test(s);
+      if (hasZone) {
+        d = new Date(s);
+      } else {
+        // Interpretar como hora local y crear objeto UTC con la misma hora "wall-clock"
+        const local = new Date(s);
+        d = new Date(Date.UTC(
+          local.getFullYear(),
+          local.getMonth(),
+          local.getDate(),
+          local.getHours(),
+          local.getMinutes(),
+          local.getSeconds(),
+          local.getMilliseconds()
+        ));
+      }
+    }
+    return d;
+  }
+
+  /**
    * Obtiene los slots disponibles de un médico para un rango de fechas
    */
   async obtenerDisponibilidad(medicoId, fechaInicio, fechaFin, modalidad = null, duracionCita = 30) {
@@ -30,10 +66,23 @@ class CitaService {
     }
 
     const citasAgendadas = await this.repository.obtenerCitasAgendadas(
-      medicoId, 
-      fechaInicio, 
-      fechaFin
+      medicoId,
+      fechaInicio,
+      fechaFin,
+      ['AGENDADA', 'CONFIRMADA'],
+      duracionCita
     );
+
+    // LOG: para depuración — cuántas citas se encontraron y sus horas
+    try {
+      logger.info(`Disponibilidad: medico=${medicoId} fechas=[${fechaInicio.toISOString()} - ${fechaFin.toISOString()}] citasAgendadas=${citasAgendadas.length}`);
+      citasAgendadas.forEach(c => {
+        logger.debug(`Cita agendada: id=${c.id} fecha_hora=${new Date(c.fecha_hora).toISOString()} estado=${c.estado}`);
+      });
+    } catch (err) {
+      // No detener ejecución por logs
+      logger.debug('Error al loguear citasAgendadas: ' + err.message);
+    }
 
     const slotsDisponibles = this._generarSlotsDisponibles(
       disponibilidades,
@@ -42,13 +91,15 @@ class CitaService {
       fechaFin,
       duracionCita
     );
+    // Filtrar y devolver SOLO los slots realmente disponibles (no incluir los ocupados)
+    const soloDisponibles = slotsDisponibles.filter(s => s.disponible === true);
 
     return {
       medico_id: medicoId,
       fecha_inicio: fechaInicio,
       fecha_fin: fechaFin,
       duracion_cita_minutos: duracionCita,
-      disponibilidad: slotsDisponibles
+      disponibilidad: soloDisponibles
     };
   }
 
@@ -150,10 +201,18 @@ class CitaService {
    * CORREGIDO: Ahora verifica solapamiento de intervalos completos
    */
   _existeCitaEnSlot(horaInicio, horaFin, citasConDuracion) {
-    return citasConDuracion.some(({ inicio, fin }) => {
+    return citasConDuracion.some(({ inicio, fin, cita }) => {
       // Dos intervalos se solapan si:
       // (inicio1 < fin2) AND (fin1 > inicio2)
-      return (horaInicio < fin) && (horaFin > inicio);
+      const solapa = (horaInicio < fin) && (horaFin > inicio);
+      if (solapa) {
+        try {
+          logger.debug(`Slot ocupado detectado: slot=[${horaInicio.toISOString()} - ${horaFin.toISOString()}] por cita=${cita?.id} cita_window=[${inicio.toISOString()} - ${fin.toISOString()}]`);
+        } catch (err) {
+          logger.debug('Error logueando solapamiento: ' + err.message);
+        }
+      }
+      return solapa;
     });
   }
 
@@ -162,7 +221,7 @@ class CitaService {
    * CORREGIDO: Ahora valida que el slot completo quepa en el horario disponible
    */
   async validarSlotDisponible(medicoId, fechaHora, duracionMinutos = 30, excludeCitaId = null) {
-    const fecha = new Date(fechaHora);
+    const fecha = this._parseInputDateToUTC(fechaHora instanceof Date ? fechaHora : fechaHora);
     
     if (fecha <= new Date()) {
       return {
@@ -260,7 +319,7 @@ class CitaService {
       throw new Error('Paciente no encontrado');
     }
 
-    const fechaCita = new Date(fecha_hora);
+    const fechaCita = this._parseInputDateToUTC(fecha_hora);
     const validacion = await this.validarSlotDisponible(medico_id, fechaCita, duracion_minutos);
     
     if (!validacion.disponible) {
@@ -344,6 +403,19 @@ class CitaService {
       duracion_estimada_minutos: duracion_minutos,
       notificacion_enviada: notificacionEnviada
     };
+
+    // Invalidar cache relacionado (si existe) para que la disponibilidad se refresque
+    try {
+      const cacheModule = await import('../config/cache.js').catch(() => null);
+      const cache = cacheModule && (cacheModule.default || cacheModule);
+      if (cache && typeof cache.invalidateNamespace === 'function') {
+        // Invalidate by medico and paciente namespaces (best-effort)
+        await cache.invalidateNamespace(`disponibilidad:medico:${medico_id}`);
+        await cache.invalidateNamespace(`citas:paciente:${paciente_id}`);
+      }
+    } catch (err) {
+      logger.debug('No se pudo invalidar cache tras crear cita: ' + err.message);
+    }
   }
 
   /**
@@ -399,6 +471,18 @@ class CitaService {
       throw new Error('Cita no encontrada');
     }
 
+    // Si ya está cancelada, devolver resultado idempotente en vez de error
+    if (cita.estado === 'CANCELADA') {
+      return {
+        id: cita.id,
+        estado: cita.estado,
+        fecha_hora: cita.fecha_hora,
+        medico_id: cita.medico_id,
+        paciente_id: cita.paciente_id,
+        mensaje: 'La cita ya se encuentra en estado CANCELADA'
+      };
+    }
+
     // Validar que la cita pueda ser cancelada
     if (!['AGENDADA', 'CONFIRMADA'].includes(cita.estado)) {
       throw new Error(
@@ -425,6 +509,17 @@ class CitaService {
       notas_consulta: motivo_cancelacion ? `Cancelada: ${motivo_cancelacion}` : 'Cancelada por paciente'
     });
 
+    // Invalidar cache para que la disponibilidad vuelva a mostrarse
+    try {
+      const cacheModule = await import('../config/cache.js').catch(() => null);
+      const cache = cacheModule && (cacheModule.default || cacheModule);
+      if (cache && typeof cache.invalidateNamespace === 'function') {
+        await cache.invalidateNamespace(`disponibilidad:medico:${citaCancelada.medico_id}`);
+        await cache.invalidateNamespace(`citas:paciente:${citaCancelada.paciente_id}`);
+      }
+    } catch (err) {
+      logger.debug('No se pudo invalidar cache tras cancelar cita: ' + err.message);
+    }
     return {
       id: citaCancelada.id,
       estado: citaCancelada.estado,
@@ -469,7 +564,7 @@ class CitaService {
 
     // Si se cambia fecha/hora, validar disponibilidad y anticipación
     if (actualizacion.fecha_hora) {
-      const nuevaFecha = new Date(actualizacion.fecha_hora);
+      const nuevaFecha = this._parseInputDateToUTC(actualizacion.fecha_hora);
 
       // Validar que sea una fecha válida
       if (isNaN(nuevaFecha.getTime())) {
@@ -514,6 +609,18 @@ class CitaService {
     const citaActualizada = await this.repository.actualizarCita(citaId, actualizacion);
 
     logger.info(`✅ Cita ${citaId} actualizada exitosamente`);
+
+    // Invalidar cache tras edición para refrescar disponibilidad
+    try {
+      const cacheModule = await import('../config/cache.js').catch(() => null);
+      const cache = cacheModule && (cacheModule.default || cacheModule);
+      if (cache && typeof cache.invalidateNamespace === 'function') {
+        await cache.invalidateNamespace(`disponibilidad:medico:${cita.medico_id}`);
+        await cache.invalidateNamespace(`citas:paciente:${cita.paciente_id}`);
+      }
+    } catch (err) {
+      logger.debug('No se pudo invalidar cache tras editar cita: ' + err.message);
+    }
 
     // Enviar notificación al paciente
     try {

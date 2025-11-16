@@ -83,7 +83,7 @@ class CitaController {
       });
 
     } catch (error) {
-      console.error('Error al obtener disponibilidad: - citasController.js:85', error);
+      console.error('Error al obtener disponibilidad: - citasController.js:86', error);
       
       if (error.message === 'Médico no encontrado') {
         return res.status(404).json({
@@ -135,7 +135,7 @@ class CitaController {
       });
 
     } catch (error) {
-      console.error('Error al validar slot: - citasController.js:137', error);
+      console.error('Error al validar slot: - citasController.js:138', error);
       res.status(500).json({
         error: 'Error al validar disponibilidad',
         mensaje: error.message
@@ -188,7 +188,7 @@ class CitaController {
       });
 
     } catch (error) {
-      console.error('Error al obtener próximos slots: - citasController.js:190', error);
+      console.error('Error al obtener próximos slots: - citasController.js:191', error);
       
       if (error.message === 'Médico no encontrado') {
         return res.status(404).json({
@@ -258,7 +258,7 @@ class CitaController {
       });
 
     } catch (error) {
-      console.error('Error al crear cita: - citasController.js:260', error);
+      console.error('Error al crear cita: - citasController.js:261', error);
 
       if (error.message.includes('no encontrado')) {
         return res.status(404).json({ error: error.message });
@@ -286,6 +286,13 @@ class CitaController {
     try {
       let { pacienteId } = req.params;
       const { estado, fecha_desde, fecha_hasta, modalidad, ordenar_por } = req.query;
+
+      // LOG: registrar parámetros entrantes para depuración de endpoint
+      try {
+        logger.info(`obtenerCitasPaciente - pacienteId=${pacienteId} query=${JSON.stringify(req.query)}`);
+      } catch (err) {
+        logger.debug('obtenerCitasPaciente - no se pudo serializar query params');
+      }
 
       if (!pacienteId) {
         return res.status(400).json({
@@ -318,6 +325,12 @@ class CitaController {
       };
 
       const citas = await this.service.obtenerCitasPaciente(pacienteId, filtros);
+
+      try {
+        logger.info(`obtenerCitasPaciente - pacienteId=${pacienteId} total_citas_recuperadas=${citas.length}`);
+      } catch (err) {
+        logger.debug('obtenerCitasPaciente - no se pudo loggear cantidad de citas');
+      }
 
       res.status(200).json({
         success: true,
@@ -413,7 +426,8 @@ class CitaController {
   cancelarCita = async (req, res) => {
     try {
       const { citaId } = req.params;
-      const { motivo_cancelacion } = req.body;
+      // Evitar crash si req.body es undefined (peticiones DELETE sin body desde front)
+      const { motivo_cancelacion } = req.body || {};
 
       if (!citaId) {
         return res.status(400).json({
@@ -423,7 +437,13 @@ class CitaController {
 
       // AUTHORIZATION: permitir solo al paciente dueño, al médico asociado o a admins
       const user = req.user;
+      try {
+        logger.debug('cancelarCita - req.user: ' + JSON.stringify(user));
+      } catch (err) {
+        logger.debug('cancelarCita - req.user (no serializable)');
+      }
       if (!user) {
+        logger.info(`cancelarCita - sin usuario en req para citaId=${citaId}`);
         return res.status(401).json({ error: 'No autenticado' });
       }
 
@@ -435,7 +455,14 @@ class CitaController {
         ]
       });
 
+      try {
+        logger.debug('cancelarCita - cita encontrada: ' + JSON.stringify({ id: cita?.id, fecha_hora: cita?.fecha_hora, estado: cita?.estado, paciente: cita?.paciente?.id, medico: cita?.medico?.id }));
+      } catch (err) {
+        logger.debug('cancelarCita - cita (no serializable)');
+      }
+
       if (!cita) {
+        logger.info(`cancelarCita - cita no encontrada: ${citaId}`);
         return res.status(404).json({ error: 'Cita no encontrada' });
       }
 
@@ -445,9 +472,11 @@ class CitaController {
       const esMedicoAsociado = cita.medico && cita.medico.usuario && cita.medico.usuario.id === usuarioId;
 
       if (!esAdmin && !esPacientePropietario && !esMedicoAsociado) {
+        logger.info(`cancelarCita - usuario sin permisos: userId=${usuarioId} citaId=${citaId} pacienteUsuario=${cita.paciente?.usuario?.id} medicoUsuario=${cita.medico?.usuario?.id}`);
         return res.status(403).json({ error: 'No tiene permisos para cancelar esta cita' });
       }
 
+      logger.info(`cancelarCita - permiso validado: userId=${usuarioId} procediendo a cancelar cita=${citaId}`);
       const citaCancelada = await this.service.cancelarCita(citaId, motivo_cancelacion);
 
       res.status(200).json({
@@ -457,7 +486,7 @@ class CitaController {
       });
 
     } catch (error) {
-      console.error('Error al cancelar cita: - citasController.js:415', error);
+      console.error('Error al cancelar cita: - citasController.js:475', error);
 
       if (error.message === 'Cita no encontrada') {
         return res.status(404).json({
