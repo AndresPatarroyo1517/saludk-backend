@@ -256,18 +256,29 @@ const confirmarCompra = async (compraId) => {
     const t = await sequelize.transaction();
 
     try {
-      // 1. Actualizar estado de compra a PENDIENTE
-      const updateCompraSql = `
-        UPDATE public.compra 
-        SET estado = 'PENDIENTE', fecha_pago = now(), fecha_actualizacion = now()
+      // 1. Verificar que la compra existe y está en estado CARRITO
+      const verificarCompraSql = `
+        SELECT id, estado, paciente_id 
+        FROM public.compra 
         WHERE id = :compraId
       `;
-      await sequelize.query(updateCompraSql, {
+      const [compras] = await sequelize.query(verificarCompraSql, {
         replacements: { compraId },
+        type: QueryTypes.SELECT,
         transaction: t,
       });
 
-      // 2. Decrementar stock
+      if (!compras) {
+        throw new Error(`Compra ${compraId} no encontrada`);
+      }
+
+      if (compras.estado !== 'CARRITO') {
+        throw new Error(
+          `La compra ${compraId} ya fue procesada. Estado actual: ${compras.estado}`
+        );
+      }
+
+      // 2. Obtener items de la compra
       const getItemsSql = `
         SELECT producto_id, cantidad 
         FROM public.compra_producto 
@@ -279,43 +290,139 @@ const confirmarCompra = async (compraId) => {
         transaction: t,
       });
 
+      if (!items || items.length === 0) {
+        throw new Error(`No hay productos en la compra ${compraId}`);
+      }
+
+      // 3. Decrementar stock con validación CORRECTA
       for (const item of items) {
+        // Primero verificar stock disponible
+        const checkStockSql = `
+          SELECT cantidad_disponible 
+          FROM public.stock 
+          WHERE producto_id = :productoId
+        `;
+        const [stockActual] = await sequelize.query(checkStockSql, {
+          replacements: { productoId: item.producto_id },
+          type: QueryTypes.SELECT,
+          transaction: t,
+        });
+
+        if (!stockActual) {
+          throw new Error(
+            `No existe registro de stock para producto ${item.producto_id}`
+          );
+        }
+
+        const stockDisponible = Number(stockActual.cantidad_disponible || 0);
+        const cantidadRequerida = Number(item.cantidad);
+
+        if (stockDisponible < cantidadRequerida) {
+          throw new Error(
+            `Stock insuficiente para producto ${item.producto_id}. ` +
+            `Disponible: ${stockDisponible}, Requerido: ${cantidadRequerida}`
+          );
+        }
+
+        // Ahora sí decrementar
         const updateStockSql = `
           UPDATE public.stock
           SET cantidad_disponible = cantidad_disponible - :cantidad
-          WHERE producto_id = :productoId AND cantidad_disponible >= :cantidad
+          WHERE producto_id = :productoId
+          RETURNING cantidad_disponible
         `;
-        await sequelize.query(updateStockSql, {
+        const [result] = await sequelize.query(updateStockSql, {
           replacements: { 
             productoId: item.producto_id, 
-            cantidad: item.cantidad 
+            cantidad: cantidadRequerida 
           },
           transaction: t,
         });
 
-        const checkSql = `SELECT cantidad_disponible FROM public.stock WHERE producto_id = :productoId`;
-        const rows = await sequelize.query(checkSql, { 
-          replacements: { productoId: item.producto_id }, 
-          type: QueryTypes.SELECT, 
-          transaction: t 
-        });
-        
-        const remaining = rows && rows[0] ? Number(rows[0].cantidad_disponible || 0) : 0;
-        if (remaining < 0) {
-          throw new Error(`Stock inconsistente para producto ${item.producto_id}`);
+        // Verificación de seguridad post-actualización
+        if (result && result[0]) {
+          const nuevoStock = Number(result[0].cantidad_disponible);
+          if (nuevoStock < 0) {
+            throw new Error(
+              `Stock inconsistente detectado para producto ${item.producto_id}. ` +
+              `Stock resultante: ${nuevoStock}`
+            );
+          }
         }
       }
 
-      await t.commit();
-      logger.info(`✅ Compra ${compraId} confirmada y stock actualizado`);
+      // 4. Actualizar estado de compra a PENDIENTE
+      const updateCompraSql = `
+        UPDATE public.compra 
+        SET estado = 'PENDIENTE', 
+            fecha_pago = NOW(), 
+            fecha_actualizacion = NOW()
+        WHERE id = :compraId AND estado = 'CARRITO'
+        RETURNING id, numero_orden
+      `;
+      const [compraResult] = await sequelize.query(updateCompraSql, {
+        replacements: { compraId },
+        transaction: t,
+      });
 
-      // 3. Enviar notificación al paciente
+      if (!compraResult || compraResult.length === 0) {
+        throw new Error(
+          `No se pudo actualizar la compra ${compraId}. ` +
+          `Posible condición de carrera o compra ya procesada.`
+        );
+      }
+
+      // 5. **CRÍTICO**: Actualizar orden_pago a COMPLETADA
+      const updateOrdenPagoSql = `
+        UPDATE public.orden_pago
+        SET estado = 'COMPLETADA', 
+            fecha_pago = NOW(),
+            fecha_actualizacion = NOW()
+        WHERE compra_id = :compraId 
+          AND tipo_orden = 'COMPRA'
+          AND estado IN ('PENDIENTE', 'PROCESANDO')
+        RETURNING id, referencia_transaccion
+      `;
+      const [ordenResult] = await sequelize.query(updateOrdenPagoSql, {
+        replacements: { compraId },
+        transaction: t,
+      });
+
+      if (!ordenResult || ordenResult.length === 0) {
+        throw new Error(
+          `No se encontró orden de pago válida para la compra ${compraId}. ` +
+          `Verifica que exista una orden_pago con tipo_orden='COMPRA' y estado='PENDIENTE'.`
+        );
+      }
+
+      await t.commit();
+
+      const numeroOrden = compraResult[0].numero_orden;
+      const ordenPagoId = ordenResult[0].id;
+      const referenciaTransaccion = ordenResult[0].referencia_transaccion;
+
+      logger.info(
+        `✅ Compra ${compraId} confirmada exitosamente. ` +
+        `Orden: ${numeroOrden} | OrdenPago: ${ordenPagoId} | ` +
+        `Productos: ${items.length} | Stock actualizado`
+      );
+
+      // 6. Enviar notificación (fuera de la transacción)
       await enviarNotificacionCambioEstado(compraId, 'PENDIENTE');
       
-      return { success: true, compraId, estado: 'PENDIENTE' };
+      return { 
+        success: true, 
+        compraId, 
+        estado: 'PENDIENTE',
+        numeroOrden,
+        ordenPagoId,
+        referenciaTransaccion,
+        productosActualizados: items.length
+      };
 
     } catch (txErr) {
       await t.rollback();
+      logger.error(`❌ Rollback en confirmarCompra: ${txErr.message}`);
       throw txErr;
     }
 

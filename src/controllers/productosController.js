@@ -302,7 +302,6 @@ class ProductosController {
   async obtenerMisCompras(req, res) {
     try {
       const pacienteId = req.user.paciente.id;
-
       const { estado, limit = 20, offset = 0 } = req.query;
 
       const compras = await productosService.obtenerComprasPorPaciente(
