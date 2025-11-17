@@ -227,4 +227,6 @@ router.put('/mi-perfil/actualizar', requireMedico, (req, res) => {
   return controller.actualizarPerfil(req, res);
 });
 
+// (Endpoint de cambio de estado por médico revertido)
+
 export default router;

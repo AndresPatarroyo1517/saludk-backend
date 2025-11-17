@@ -439,11 +439,83 @@ class CitaController {
           ejemplo: {
             "fecha_hora": "2025-11-20T14:30:00Z",
             "modalidad": "VIRTUAL",
-            "motivo_consulta": "Consulta de seguimiento",
-            "notas_consulta": "Paciente con alergia a penicilina"
+            "motivo_consulta": "Consulta de seguimiento"
           },
           nota: "Asegúrese de usar COMILLAS DOBLES en todas las propiedades y valores de JSON"
         });
+      }
+
+      // Eliminar campos que no deben ser actualizados desde el endpoint
+      if (datosActualizacion.hasOwnProperty('notas_consulta')) {
+        delete datosActualizacion.notas_consulta;
+      }
+
+      // Si se solicita cambio de estado, validar permisos y reglas
+      if (datosActualizacion.hasOwnProperty('estado')) {
+        const nuevoEstado = String(datosActualizacion.estado).toUpperCase();
+
+        // Requiere autenticación
+        const user = req.user;
+        if (!user) {
+          return res.status(401).json({ error: 'No autenticado' });
+        }
+
+        // Cargar cita completa (paciente y medico con usuario)
+        const cita = await db.Cita.findByPk(citaId, {
+          include: [
+            { association: 'paciente', include: [{ association: 'usuario' }] },
+            { association: 'medico', include: [{ association: 'usuario' }] }
+          ]
+        });
+
+        if (!cita) {
+          return res.status(404).json({ error: 'Cita no encontrada' });
+        }
+
+        const usuarioId = user.userId;
+        const esAdmin = user.rol === 'ADMIN';
+        const esPacientePropietario = cita.paciente && cita.paciente.usuario && cita.paciente.usuario.id === usuarioId;
+        const esMedicoAsociado = cita.medico && cita.medico.usuario && cita.medico.usuario.id === usuarioId;
+
+        // Reglas para cada transición
+        if (nuevoEstado === 'CONFIRMADA') {
+          if (!esAdmin && !esMedicoAsociado) {
+            return res.status(403).json({ error: 'No tiene permisos para confirmar esta cita' });
+          }
+          if (cita.estado !== 'AGENDADA') {
+            return res.status(400).json({ error: `No se puede confirmar una cita en estado ${cita.estado}` });
+          }
+        }
+
+        if (nuevoEstado === 'COMPLETADA') {
+          if (!esAdmin && !esMedicoAsociado) {
+            return res.status(403).json({ error: 'No tiene permisos para marcar como completada esta cita' });
+          }
+          const ahora = new Date();
+          const fechaCita = new Date(cita.fecha_hora);
+          if (fechaCita > ahora) {
+            return res.status(400).json({ error: 'No se puede marcar como completada una cita que aún no ha ocurrido' });
+          }
+        }
+
+        if (nuevoEstado === 'CANCELADA') {
+          if (!esAdmin && !esPacientePropietario && !esMedicoAsociado) {
+            return res.status(403).json({ error: 'No tiene permisos para cancelar esta cita' });
+          }
+          // Reutilizar la lógica de servicio de cancelación (valida anticipación y estados)
+          try {
+            const citaCancelada = await this.service.cancelarCita(citaId, null);
+            return res.status(200).json({ success: true, mensaje: 'Cita cancelada exitosamente', data: citaCancelada });
+          } catch (err) {
+            if (err.message && err.message.includes('No se puede cancelar')) {
+              return res.status(400).json({ error: err.message });
+            }
+            throw err;
+          }
+        }
+
+        // Asignar estado validado
+        datosActualizacion.estado = nuevoEstado;
       }
 
       const citaActualizada = await this.service.editarCita(citaId, datosActualizacion);

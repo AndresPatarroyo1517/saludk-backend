@@ -563,8 +563,9 @@ class CitaService {
   }
 
   /**
-   * Edita una cita existente - acepta CUALQUIER campo editable
-   * Campos protegidos (no editables): id, paciente_id, medico_id, estado, fecha_creacion, fecha_actualizacion
+  * Edita una cita existente - acepta CUALQUIER campo editable
+  * Campos protegidos (no editables): id, paciente_id, medico_id, fecha_creacion, fecha_actualizacion
+  * Nota: el campo `estado` puede ser actualizado cuando el controlador lo valida
    * Valida disponibilidad solo si se cambia fecha_hora
    */
   async editarCita(citaId, datosActualizacion) {
@@ -582,8 +583,8 @@ class CitaService {
       );
     }
 
-    // Campos no editables (protegidos)
-    const camposProtegidos = ['id', 'paciente_id', 'medico_id', 'estado', 'fecha_creacion', 'fecha_actualizacion'];
+    // Campos no editables (protegidos). `estado` puede venir del controlador después de validar reglas de negocio
+    const camposProtegidos = ['id', 'paciente_id', 'medico_id', 'fecha_creacion', 'fecha_actualizacion', 'notas_consulta'];
     
     // Preparar datos a actualizar (excluir campos protegidos)
     const actualizacion = {};

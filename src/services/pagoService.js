@@ -54,6 +54,12 @@ class PaymentService {
       });
 
       logger.info(`✅ Orden de pago creada exitosamente: ${resultado.orden.id}`);
+      logger.info('🔍 [DEBUG] Resultado del procesador:', {
+        orden_id: resultado.orden?.id,
+        tiene_paymentIntent: !!resultado.paymentIntent,
+        client_secret: resultado.paymentIntent?.client_secret?.substring(0, 20) + '...',
+        paymentIntent_completo: resultado.paymentIntent
+      });
 
       return {
         success: true,
@@ -117,7 +123,7 @@ class PaymentService {
   async simularConfirmacionPSE(ordenId, exito = true) {
     try {
       const procesador = crearProcesadorPago('PASARELA');
-      
+
       if (exito) {
         const orden = await procesador.confirmarPago(ordenId, {
           estado_simulado: 'APROBADA',
@@ -196,7 +202,7 @@ class PaymentService {
   async obtenerOrden(ordenId) {
     try {
       const orden = await OrdenPago.findByPk(ordenId);
-      
+
       if (!orden) {
         throw new Error(`Orden ${ordenId} no encontrada`);
       }
@@ -387,10 +393,10 @@ class PaymentService {
       if (orden.tipo_orden === 'COMPRA' && orden.compra_id) {
         // ⚡ Importar dinámicamente para evitar dependencia circular
         const productosService = (await import('./productosService.js')).default;
-        
+
         // Confirmar compra y actualizar stock
         await productosService.confirmarCompra(orden.compra_id);
-        
+
         logger.info(`✅ Compra ${orden.compra_id} confirmada y stock actualizado`);
       }
 

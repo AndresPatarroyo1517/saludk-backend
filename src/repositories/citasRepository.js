@@ -228,7 +228,14 @@ class CitaRepository {
       include: [
         {
           association: 'medico',
-          attributes: ['id', 'nombres', 'apellidos', 'especialidad']
+          attributes: ['id', 'nombres', 'apellidos', 'especialidad'],
+          include: [{ model: db.Usuario, as: 'usuario', attributes: ['id', 'email'] }]
+        },
+        {
+          model: db.Paciente,
+          as: 'paciente',
+          attributes: ['id', 'nombres', 'apellidos'],
+          include: [{ model: db.Usuario, as: 'usuario', attributes: ['id', 'email'] }]
         }
       ]
     });
@@ -251,7 +258,14 @@ class CitaRepository {
     const citaActualizada = await this.Cita.findByPk(citaId, {
       include: [
         { model: db.Medico, as: 'medico', attributes: ['id', 'nombres', 'apellidos', 'especialidad'] },
-        { model: db.Paciente, as: 'paciente', attributes: ['id', 'nombres', 'apellidos', 'email'] }
+        { 
+          model: db.Paciente, 
+          as: 'paciente', 
+          attributes: ['id', 'nombres', 'apellidos'],
+          include: [
+            { model: db.Usuario, as: 'usuario', attributes: ['email'] }
+          ]
+        }
       ]
     });
 

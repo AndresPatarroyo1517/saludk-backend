@@ -90,7 +90,7 @@ export class ProcesadorConsignacion extends ProcesadorPago {
       const { comprobanteUrl, verificadoPor, numeroComprobante } = datosConfirmacion;
 
       await orden.update({
-        estado: 'COMPLETADO',
+        estado: 'COMPLETADA',
         fecha_pago: new Date(),
         fecha_actualizacion: new Date(),
         comprobante_url: comprobanteUrl || orden.comprobante_url,
@@ -123,7 +123,7 @@ export class ProcesadorConsignacion extends ProcesadorPago {
       }
 
       await orden.update({
-        estado: 'CANCELADO',
+        estado: 'FALLIDA',
         fecha_actualizacion: new Date(),
         datos_transaccion: {
           ...orden.datos_transaccion,
@@ -153,7 +153,7 @@ export class ProcesadorConsignacion extends ProcesadorPago {
 
       await orden.update({
         comprobante_url: comprobanteUrl,
-        estado: 'EN_VERIFICACION', // Cambiar estado para que admin verifique
+        estado: 'PROCESANDO', // Cambiar estado para que admin verifique
         fecha_actualizacion: new Date(),
         datos_transaccion: {
           ...orden.datos_transaccion,

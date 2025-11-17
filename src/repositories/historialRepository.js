@@ -4,6 +4,7 @@ import {
   ProductoFarmaceutico,
   Paciente,
   Direccion,
+  Usuario,
   sequelize
 } from '../models/index.js';
 import { Op } from 'sequelize';
@@ -18,7 +19,7 @@ class HistorialRepository {
       return await Compra.findByPk(compraId, {
         include: [
           { model: CompraProducto, as: 'productos', include: [{ model: ProductoFarmaceutico, as: 'producto' }] },
-          { model: Paciente, as: 'paciente', attributes: ['id', 'nombres', 'apellidos', 'email'] },
+          { model: Paciente, as: 'paciente', attributes: ['id', 'nombres', 'apellidos'], include: [{ model: Usuario, as: 'usuario', attributes: ['email'] }] },
           { model: Direccion, as: 'direccion', attributes: ['id', 'direccion', 'ciudad'] }
         ]
       });

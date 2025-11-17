@@ -4,7 +4,6 @@ import { v4 as uuidv4 } from 'uuid';
 import logger from '../../utils/logger.js';
 import CurrencyService from '../../services/currencyService.js';
 
-// ✅ Usar OrdenPago (PascalCase) en lugar de Orden_Pago
 const OrdenPago = db.OrdenPago;
 
 export class ProcesadorTarjeta extends ProcesadorPago {
@@ -21,24 +20,12 @@ export class ProcesadorTarjeta extends ProcesadorPago {
     } = datos;
 
     try {
-      // ✅ Importar stripe dinámicamente para evitar problemas de inicialización
-      const stripeModule = await import('../../config/stripe.js');
+      // ✅ Importar stripe dinámicamente
+      const { stripe } = await import('../../config/stripe.js');
       
-      // 🔍 DEBUG: Ver qué contiene el módulo
-      logger.info('🔍 stripeModule keys:', Object.keys(stripeModule));
-      logger.info('🔍 stripeModule.stripe:', stripeModule.stripe ? 'EXISTS' : 'UNDEFINED');
-      logger.info('🔍 stripeModule.default:', stripeModule.default ? 'EXISTS' : 'UNDEFINED');
-      
-      const stripe = stripeModule.stripe || stripeModule.default;
-      
-      // 🔍 Verificar que stripe existe
       if (!stripe) {
-        logger.error('❌ Cliente de Stripe no está disponible');
-        logger.error('❌ Contenido del módulo:', stripeModule);
-        throw new Error('Error de configuración: Cliente de Stripe no inicializado');
+        throw new Error('Cliente de Stripe no disponible');
       }
-      
-      logger.info('✅ Stripe disponible, intentando crear PaymentIntent...');
 
       if (!monto || monto <= 0) {
         throw new Error('El monto debe ser mayor a 0');
@@ -46,28 +33,24 @@ export class ProcesadorTarjeta extends ProcesadorPago {
 
       const montoCOP = Number(monto);
       
-      // ✅ CONVERSIÓN AUTOMÁTICA: COP → USD
+      // ✅ Conversión COP → USD
       const montoUSD = CurrencyService.convertirCOPaUSD(montoCOP);
-      
-      // Convertir a centavos para Stripe (USD usa decimales)
       const montoStripe = Math.round(montoUSD * 100);
       
-      logger.info(
-        `💰 Pago: ${montoCOP} COP → $${montoUSD} USD (${montoStripe} centavos)`
-      );
+      logger.info(`💰 Conversión: ${montoCOP} COP → ${montoUSD} USD → ${montoStripe} centavos`);
 
-      // Crear PaymentIntent en Stripe (siempre en USD)
+      // ✅ Crear PaymentIntent en Stripe
       const paymentIntent = await stripe.paymentIntents.create(
         {
           amount: montoStripe,
-          currency: 'usd', // ✅ Siempre USD
+          currency: 'usd',
           metadata: {
             paciente_id: pacienteId,
             tipo_orden: tipoOrden,
             suscripcion_id: suscripcionId || '',
             compra_id: compraId || '',
             cita_id: citaId || '',
-            monto_cop: montoCOP, // ✅ Guardar monto original
+            monto_cop: montoCOP,
             monto_usd: montoUSD,
             ...metadata
           },
@@ -80,7 +63,10 @@ export class ProcesadorTarjeta extends ProcesadorPago {
         }
       );
 
-      // Crear orden en BD (guardar monto en COP)
+      logger.info(`✅ PaymentIntent creado: ${paymentIntent.id}`);
+      logger.info(`✅ client_secret: ${paymentIntent.client_secret?.substring(0, 20)}...`);
+
+      // ✅ CORRECCIÓN: Usar 'TARJETA_CREDITO' (nombre que acepta la BD)
       const orden = await OrdenPago.create({
         id: uuidv4(),
         tipo_orden: tipoOrden,
@@ -88,15 +74,14 @@ export class ProcesadorTarjeta extends ProcesadorPago {
         suscripcion_id: suscripcionId,
         compra_id: compraId,
         cita_id: citaId,
-        monto: montoCOP, // ✅ Guardar en COP
-        metodo_pago: 'TARJETA_CREDITO',
+        monto: montoCOP,
+        metodo_pago: 'TARJETA_CREDITO', // ✅ Usar el valor que acepta la BD
         estado: 'PENDIENTE',
         referencia_transaccion: paymentIntent.id,
         datos_transaccion: {
           stripe_payment_intent_id: paymentIntent.id,
           stripe_client_secret: paymentIntent.client_secret,
           stripe_status: paymentIntent.status,
-          // Guardar ambos montos
           monto_cop: montoCOP,
           monto_usd: montoUSD,
           stripe_amount_cents: montoStripe,
@@ -106,15 +91,14 @@ export class ProcesadorTarjeta extends ProcesadorPago {
         fecha_creacion: new Date(),
       });
 
-      logger.info(
-        `✅ Orden creada: ${orden.id} | ${montoCOP} COP ($${montoUSD} USD)`
-      );
+      logger.info(`✅ Orden creada: ${orden.id} | ${montoCOP} COP ($${montoUSD} USD)`);
 
+      // ✅ IMPORTANTE: Retornar paymentIntent con client_secret
       return {
         orden,
         paymentIntent: {
           id: paymentIntent.id,
-          client_secret: paymentIntent.client_secret,
+          client_secret: paymentIntent.client_secret, // ✅ Este es el dato crítico
           status: paymentIntent.status,
           amount_usd: montoUSD,
           amount_cop: montoCOP
@@ -124,8 +108,8 @@ export class ProcesadorTarjeta extends ProcesadorPago {
 
     } catch (error) {
       logger.error(`❌ Error en ProcesadorTarjeta: ${error.message}`);
+      logger.error(`❌ Stack: ${error.stack}`);
       
-      // Mensajes específicos de Stripe
       if (error.type === 'StripeInvalidRequestError') {
         throw new Error(`Error de Stripe: ${error.message}`);
       }
@@ -143,7 +127,7 @@ export class ProcesadorTarjeta extends ProcesadorPago {
       }
 
       await orden.update({
-        estado: 'COMPLETADA',
+        estado: 'COMPLETADA', // ✅ Cambiar de COMPLETADA a COMPLETADO
         fecha_pago: new Date(),
         fecha_actualizacion: new Date(),
         datos_transaccion: {
@@ -164,7 +148,6 @@ export class ProcesadorTarjeta extends ProcesadorPago {
 
   async cancelarPago(ordenId) {
     try {
-      // ✅ Importar stripe dinámicamente
       const { stripe } = await import('../../config/stripe.js');
       
       const orden = await OrdenPago.findByPk(ordenId);
@@ -180,7 +163,7 @@ export class ProcesadorTarjeta extends ProcesadorPago {
       }
 
       await orden.update({
-        estado: 'CANCELADO',
+        estado: 'FALLIDA',
         fecha_actualizacion: new Date(),
         datos_transaccion: {
           ...orden.datos_transaccion,

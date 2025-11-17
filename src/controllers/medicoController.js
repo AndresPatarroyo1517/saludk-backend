@@ -33,7 +33,7 @@ class MedicoController {
       });
 
     } catch (error) {
-      console.error('Error al configurar disponibilidad:', error);
+      console.error('Error al configurar disponibilidad: - medicoController.js:38', error);
 
       if (error.message === 'Médico no encontrado') {
         return res.status(404).json({ error: error.message });
@@ -66,7 +66,7 @@ class MedicoController {
       });
 
     } catch (error) {
-      console.error('Error al obtener disponibilidad:', error);
+      console.error('Error al obtener disponibilidad: - medicoController.js:71', error);
 
       if (error.message === 'Médico no encontrado') {
         return res.status(404).json({ error: error.message });
@@ -118,7 +118,7 @@ class MedicoController {
       });
 
     } catch (error) {
-      console.error('Error al listar médicos:', error);
+      console.error('Error al listar médicos: - medicoController.js:123', error);
       res.status(500).json({
         error: 'Error al listar médicos',
         mensaje: error.message
@@ -146,7 +146,7 @@ class MedicoController {
       });
 
     } catch (error) {
-      console.error('Error al obtener detalle del médico:', error);
+      console.error('Error al obtener detalle del médico: - medicoController.js:151', error);
 
       if (error.message === 'Médico no encontrado') {
         return res.status(404).json({ error: error.message });
@@ -158,6 +158,8 @@ class MedicoController {
       });
     }
   };
+
+  
 }
 
 export default MedicoController;

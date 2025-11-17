@@ -201,16 +201,11 @@ class PaymentController {
   async subirComprobante(req, res) {
     try {
       const { ordenId } = req.params;
-      const { comprobanteUrl } = req.body;
 
-      if (!comprobanteUrl) {
-        throw new Error('La URL del comprobante es requerida');
-      }
-
-      const { ProcesadorConsignacion } = await import('../factories/factoryPagos/procesadorConsignacion.js');
+      const { ProcesadorConsignacion } = await import('../jobs/factoryPagos/procesadorConsignacion.js');
       const procesador = new ProcesadorConsignacion();
 
-      const orden = await procesador.subirComprobante(ordenId, comprobanteUrl);
+      const orden = await procesador.subirComprobante(ordenId);
 
       res.status(200).json({
         success: true,
@@ -231,17 +226,13 @@ class PaymentController {
    * Simula confirmación de PSE (para desarrollo/demos)
    * POST /api/pagos/simular-pse/:ordenId
    * 
-   * Body:
-   * {
-   *   exito: true | false
-   * }
+   * 
    */
   async simularPSE(req, res) {
     try {
       const { ordenId } = req.params;
-      const { exito = true } = req.body;
 
-      const resultado = await PaymentService.simularConfirmacionPSE(ordenId, exito);
+      const resultado = await PaymentService.simularConfirmacionPSE(ordenId);
 
       res.status(200).json(resultado);
 
@@ -315,7 +306,7 @@ class PaymentController {
         logger.error(`❌ Suscripción ${ordenActualizada.suscripcion_id} NO EXISTE en la base de datos`);
       } else {
         logger.info(`📋 Suscripción encontrada. Estado actual: ${suscripcionExistente.estado}`);
-        
+        logger.info(`📋ID: ${ordenActualizada.suscripcion_id}`);
         const [numUpdated] = await Suscripcion.update(
           { estado: 'ACTIVA', fecha_actualizacion: new Date() },
           { where: { id: ordenActualizada.suscripcion_id } }
