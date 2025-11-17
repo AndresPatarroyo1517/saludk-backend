@@ -1,6 +1,7 @@
 import fs from "fs";
 import crypto from "crypto";
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import logger from "../utils/logger.js";
 
 const endpoint = process.env.STORJ_ENDPOINT;
@@ -203,5 +204,34 @@ export const extraerKeyDeURL = (url) => {
   } catch (error) {
     logger.error('❌ Error al extraer key de URL:', error);
     return null;
+  }
+};
+
+/**
+ * Generar URL pre-firmada a partir de la ruta almacenada en la BD.
+ * Reemplaza una URL pública que NO funciona por una pre-signed válida.
+ */
+export const generarUrlFirmada = async (rutaStorj) => {
+  try {
+    // rutaStorj viene así:
+    // https://gateway.storjshare.io/saludk/documentos/xxx.pdf
+
+    const partes = rutaStorj.split("/");
+
+    const bucketName = partes[3]; // "saludk"
+    const key = partes.slice(4).join("/"); // "documentos/xxx.pdf"
+
+    const command = new GetObjectCommand({
+      Bucket: bucketName,
+      Key: key,
+    });
+
+    const signedUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
+
+    return signedUrl;
+
+  } catch (err) {
+    logger.error("Error generando URL firmada:", err.message);
+    return rutaStorj; // fallback: devolvemos la original
   }
 };

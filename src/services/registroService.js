@@ -1,7 +1,7 @@
 import SolicitudBuilder from "../jobs/solicitudBuilder.js";
 import SolicitudRepository from "../repositories/solicitudRepository.js";
 import { validatePasswordStrength } from "../utils/passwordUtils.js";
-import { subirArchivo } from "./storjService.js";
+import { subirArchivo, generarUrlFirmada } from "./storjService.js";
 import logger from "../utils/logger.js";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
@@ -158,7 +158,17 @@ class RegistroService {
   async listarDocumentosSolicitud(solicitudId) {
     try {
       const documentos = await this.repository.obtenerDocumentosPorSolicitud(solicitudId);
-      return documentos;
+      const documentosTransformados = await Promise.all(
+        documentos.map(async (doc) => {
+          const signed = await generarUrlFirmada(doc.ruta_storj);
+          return {
+            ...doc.dataValues,
+            ruta_storj: signed,
+          };
+        })
+      );
+
+      return documentosTransformados;
     } catch (error) {
       logger.error(`Error en listarDocumentosSolicitud: ${error.message}`);
       throw error;
