@@ -104,7 +104,7 @@ const router = express.Router();
  *       '404':
  *         description: Solicitud no encontrada
  */
-router.post('/solicitudes/:id/revisar', requireDirector, revisar);
+router.post('/solicitudes/:id/revisar',  revisar);
 
 /**
  * @openapi

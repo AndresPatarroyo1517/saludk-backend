@@ -2,7 +2,7 @@ import db from "../models/index.js";
 import logger from "../utils/logger.js";
 import { Op } from "sequelize";
 
-const { Usuario, Paciente, Medico, SolicitudRegistro, ResultadoValidacion, Direccion, sequelize } = db;
+const { Usuario, Paciente, Medico, SolicitudRegistro, ResultadoValidacion, Direccion, sequelize, Documento } = db;
 
 class SolicitudRepository {
 
@@ -309,6 +309,12 @@ class SolicitudRepository {
         { where: { id: solicitud.paciente.usuario_id }, transaction: t }
       );
 
+      // 3. Marcar documentos como RECHAZADOS (NO borrar)
+      await Documento.update(
+        { estado: 'VALIDADO' },
+        { where: { solicitud_id: solicitud.id }, transaction: t }
+      );
+
       await t.commit();
       logger.info({ msg: 'Solicitud aprobada por resultado_validacion', resultadoValidacionId, solicitudId: solicitud.id });
       return { solicitud, usuario_activado: true };
@@ -409,7 +415,7 @@ class SolicitudRepository {
 
       // DEVOLVER: se deja en PENDIENTE con motivo y se ACTUALIZA la fecha
       await solicitud.update({
-        estado: 'PENDIENTE',
+        estado: 'DEVUELTA',
         revisado_por: revisadoPor ?? solicitud.revisado_por,
         motivo_decision,
         fecha_validacion: new Date(), // actualiza la fecha (tu petición)
