@@ -680,18 +680,27 @@ class CitaService {
     return {
       medico_id: medicoId,
       total_hoy: resultado.total_hoy,
-      total_mes_completadas: resultado.total_mes_completadas,
+      total_mes: resultado.total_mes,
+      total_mes_completadas: resultado.total_mes_completadas, // ← agregado
       hoy: new Date().getDate(),
+
       proximas_citas_hoy: resultado.proximas_citas_hoy?.map(cita => ({
         id: cita.id,
         hora: cita.fecha_hora.toISOString(),
         estado: cita.estado,
         modalidad: cita.modalidad,
         paciente: cita.paciente ? `${cita.paciente.nombres} ${cita.paciente.apellidos}` : null
+      })),
+
+      citas_mes: resultado.citas_mes?.map(cita => ({
+        id: cita.id,
+        fecha: cita.fecha_hora.toISOString(),
+        estado: cita.estado,
+        modalidad: cita.modalidad,
+        paciente: cita.paciente ? `${cita.paciente.nombres} ${cita.paciente.apellidos}` : null
       }))
     };
   }
-
 
 }
 
