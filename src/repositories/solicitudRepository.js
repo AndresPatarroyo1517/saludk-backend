@@ -2,7 +2,7 @@ import db from "../models/index.js";
 import logger from "../utils/logger.js";
 import { Op } from "sequelize";
 
-const { Usuario, Paciente, Medico, SolicitudRegistro, ResultadoValidacion, Direccion, sequelize } = db;
+const { Usuario, Paciente, Medico, SolicitudRegistro, ResultadoValidacion, Direccion, Documento, sequelize } = db;
 
 class SolicitudRepository {
 

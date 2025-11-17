@@ -2,7 +2,7 @@ import { S3Client, ListBucketsCommand } from '@aws-sdk/client-s3';
 import logger from '../utils/logger.js';
 
 const storjConfig = {
-  region: 'auto',
+  region: 'us-east-1',
   endpoint: process.env.STORJ_ENDPOINT,
   credentials: {
     accessKeyId: process.env.STORJ_ACCESS_KEY_ID,

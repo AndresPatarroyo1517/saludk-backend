@@ -20,6 +20,12 @@ const startServer = async () => {
       logger.info('✅ Database models synchronized');
     }
 
+    app.listen(PORT, () => {
+      logger.info(`🚀 Server corriendo en: ${PORT}`);
+      logger.info(`📚 Documentación API: http://localhost:${PORT}/api/docs`);
+      logger.info(`🔧 Entorno: ${process.env.NODE_ENV}`);
+    });
+
   } catch (error) {
     logger.error('❌ Failed to start server:', error);
     process.exit(1);

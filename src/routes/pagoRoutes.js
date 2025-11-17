@@ -182,7 +182,7 @@ router.get('/orden/:ordenId', authMiddleware, PaymentController.obtenerOrden);
  *         name: estado
  *         schema:
  *           type: string
- *           enum: [PENDIENTE, COMPLETADO, FALLIDO, CANCELADO]
+ *           enum: [PENDIENTE, COMPLETADA, FALLIDA]
  *     responses:
  *       200:
  *         description: Lista de órdenes
@@ -191,10 +191,7 @@ router.get('/orden/:ordenId', authMiddleware, PaymentController.obtenerOrden);
  *       403:
  *         description: No es paciente
  */
-router.get('/mis-ordenes', requirePaciente, (req, res) => {
-  req.query.pacienteId = req.user.paciente.id;
-  return PaymentController.obtenerOrdenesPorPaciente(req, res);
-});
+router.get('/mis-ordenes', requirePaciente, PaymentController.obtenerOrdenesPorPaciente);
 
 /**
  * @swagger
