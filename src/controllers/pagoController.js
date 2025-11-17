@@ -5,7 +5,7 @@ import db from '../models/index.js';
 class PaymentController {
   /**
    * Crea una orden de pago
-   * POST /api/pagos/crear-orden
+   * POST /pagos/crear-orden
    * 
    * Body:
    * {
@@ -63,7 +63,7 @@ class PaymentController {
 
   /**
    * Webhook de Stripe
-   * POST /api/pagos/webhook
+   * POST /pagos/webhook
    * 
    * IMPORTANTE: Este endpoint debe usar express.raw() middleware
    * para que Stripe pueda verificar la firma
@@ -99,7 +99,7 @@ class PaymentController {
 
   /**
    * Confirma un pago manual (para CONSIGNACION y PASARELA)
-   * POST /api/pagos/confirmar/:ordenId
+   * POST /pagos/confirmar/:ordenId
    * 
    * Body:
    * {
@@ -137,7 +137,7 @@ class PaymentController {
 
   /**
    * Cancela una orden de pago
-   * POST /api/pagos/cancelar/:ordenId
+   * POST /pagos/cancelar/:ordenId
    * 
    * Body:
    * {
@@ -168,7 +168,7 @@ class PaymentController {
 
   /**
    * Obtiene una orden de pago por ID
-   * GET /api/pagos/orden/:ordenId
+   * GET /pagos/orden/:ordenId
    */
   async obtenerOrden(req, res) {
     try {
@@ -190,8 +190,48 @@ class PaymentController {
   }
 
   /**
+ * Obtiene todas las órdenes de un paciente
+ * GET /pagos/mis-ordenes
+ * 
+ * Query params:
+ * - estado: PENDIENTE | COMPLETADO | FALLIDO | CANCELADO
+ * - tipoOrden: SUSCRIPCION | COMPRA | CITA
+ * - fechaDesde: ISO date
+ * - fechaHasta: ISO date
+ * - limit: número (default: 50)
+ * - offset: número (default: 0)
+ */
+async obtenerOrdenesPorPaciente(req, res) {
+  try {
+    const pacienteId = req.user.paciente.id;
+    const filtros = {
+      estado: req.query.estado,
+      tipoOrden: req.query.tipoOrden,
+      fechaDesde: req.query.fechaDesde,
+      fechaHasta: req.query.fechaHasta,
+      limit: req.query.limit || 50,
+      offset: req.query.offset || 0
+    };
+
+    const resultado = await PaymentService.obtenerOrdenesPorPaciente(pacienteId, filtros);
+
+    res.status(200).json({
+      success: true,
+      ...resultado
+    });
+
+  } catch (error) {
+    logger.error(`❌ Error en obtenerOrdenesPorPaciente: ${error.message}`);
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+}
+
+  /**
    * Sube comprobante de consignación
-   * POST /api/pagos/subir-comprobante/:ordenId
+   * POST /pagos/subir-comprobante/:ordenId
    * 
    * Body:
    * {
@@ -224,7 +264,7 @@ class PaymentController {
 
   /**
    * Simula confirmación de PSE (para desarrollo/demos)
-   * POST /api/pagos/simular-pse/:ordenId
+   * POST /pagos/simular-pse/:ordenId
    * 
    * 
    */

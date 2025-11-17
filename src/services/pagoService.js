@@ -215,6 +215,67 @@ class PaymentService {
     }
   }
 
+  /**
+ * Obtiene todas las órdenes de pago de un paciente
+ * @param {string} pacienteId - ID del paciente
+ * @param {Object} filtros - Filtros opcionales (estado, tipoOrden, fechaDesde, fechaHasta)
+ */
+async obtenerOrdenesPorPaciente(pacienteId, filtros = {}) {
+  try {
+    const { estado, tipoOrden, fechaDesde, fechaHasta, limit = 50, offset = 0 } = filtros;
+
+    // Construir where clause dinámicamente
+    const whereClause = { paciente_id: pacienteId };
+
+    if (estado) {
+      whereClause.estado = estado;
+    }
+
+    if (tipoOrden) {
+      whereClause.tipo_orden = tipoOrden;
+    }
+
+    if (fechaDesde || fechaHasta) {
+      whereClause.fecha_creacion = {};
+      if (fechaDesde) {
+        whereClause.fecha_creacion[db.Sequelize.Op.gte] = new Date(fechaDesde);
+      }
+      if (fechaHasta) {
+        whereClause.fecha_creacion[db.Sequelize.Op.lte] = new Date(fechaHasta);
+      }
+    }
+
+    const ordenes = await OrdenPago.findAndCountAll({
+      where: whereClause,
+      order: [['fecha_creacion', 'DESC']], // Más recientes primero
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      include: [
+        {
+          model: Compra,
+          as: 'compra',
+          required: false,
+          attributes: ['id', 'estado', 'total']
+        }
+      ]
+    });
+
+    logger.info(`📋 Órdenes obtenidas para paciente ${pacienteId}: ${ordenes.count} total`);
+
+    return {
+      ordenes: ordenes.rows,
+      total: ordenes.count,
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      hasMore: ordenes.count > (parseInt(offset) + parseInt(limit))
+    };
+
+  } catch (error) {
+    logger.error(`❌ Error obteniendo órdenes del paciente: ${error.message}`);
+    throw error;
+  }
+}
+
   // ==================== MÉTODOS PRIVADOS ====================
 
   /**
