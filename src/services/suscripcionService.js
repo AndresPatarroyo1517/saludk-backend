@@ -9,6 +9,132 @@ const OrdenPago = db.OrdenPago;
  * ✅ PASO 1: Crea una suscripción y su orden de pago pendiente
  * NO genera el PaymentIntent de Stripe todavía
  */
+
+const cambiarPlan = async (pacienteId, nuevoPlanId, metodoPago) => {
+  try {
+    // Validaciones básicas
+    if (!nuevoPlanId) {
+      const error = new Error('El ID del nuevo plan es requerido');
+      error.status = 400;
+      throw error;
+    }
+
+    // Obtener suscripción activa actual
+    const suscripcionActual = await SuscripcionRepository.findActiveByPacienteId(pacienteId);
+
+    if (!suscripcionActual) {
+      const error = new Error('No tienes una suscripción activa para cambiar');
+      error.status = 400;
+      throw error;
+    }
+
+    // Validar que el nuevo plan sea diferente
+    if (suscripcionActual.plan_id === nuevoPlanId) {
+      const error = new Error('Ya tienes este plan activo');
+      error.status = 400;
+      throw error;
+    }
+
+    // Obtener datos del nuevo plan
+    const nuevoPlan = await Plan.findByPk(nuevoPlanId);
+    if (!nuevoPlan || !nuevoPlan.activo) {
+      const error = new Error('Plan no encontrado o no disponible');
+      error.status = 404;
+      throw error;
+    }
+
+    // Validar precio del plan
+    if (!nuevoPlan.precio_mensual || nuevoPlan.precio_mensual <= 0) {
+      const error = new Error(`El plan ${nuevoPlan.nombre} no tiene un precio válido`);
+      error.status = 400;
+      throw error;
+    }
+
+    const monto = Number(nuevoPlan.precio_mensual);
+
+    // ✅ TRANSACCIÓN ATÓMICA
+    const resultado = await db.sequelize.transaction(async (t) => {
+      // 1. Cancelar suscripción actual
+      await suscripcionActual.update(
+        { 
+          estado: 'CANCELADA',
+          fecha_actualizacion: new Date()
+        },
+        { transaction: t }
+      );
+
+      // 2. Crear nueva suscripción en PENDIENTE_PAGO (NO ACTIVA)
+      const fechaInicio = new Date();
+      const fechaVencimiento = new Date();
+      fechaVencimiento.setMonth(fechaVencimiento.getMonth() + parseInt(nuevoPlan.duracion_meses));
+
+      const nuevaSuscripcion = await SuscripcionRepository.createWithTransaction({
+        paciente_id: pacienteId,
+        plan_id: nuevoPlanId,
+        fecha_inicio: fechaInicio,
+        fecha_vencimiento: fechaVencimiento,
+        estado: 'PENDIENTE_PAGO', // ✅ CAMBIO CRÍTICO
+        auto_renovable: suscripcionActual.auto_renovable,
+        consultas_virtuales_usadas: 0,
+        consultas_presenciales_usadas: 0
+      }, t);
+
+      // 3. Crear orden de pago PENDIENTE
+      const ordenPago = await OrdenPago.create({
+        paciente_id: pacienteId,
+        suscripcion_id: nuevaSuscripcion.id,
+        tipo_orden: 'SUSCRIPCION', // ✅ Identificador especial
+        monto: monto,
+        metodo_pago: metodoPago || null,
+        estado: 'PENDIENTE',
+        referencia_transaccion: null,
+        datos_transaccion: {
+          plan_anterior_id: suscripcionActual.plan_id,
+          plan_nuevo_id: nuevoPlanId,
+          tipo_operacion: 'CAMBIO_PLAN'
+        }
+      }, { transaction: t });
+
+      return { 
+        suscripcionAnterior: suscripcionActual,
+        nuevaSuscripcion, 
+        ordenPago,
+        nuevoPlan 
+      };
+    });
+
+    logger.info(`✅ Plan cambiado - Paciente ${pacienteId} | Nueva suscripción ${resultado.nuevaSuscripcion.id} | Orden: ${resultado.ordenPago.id}`);
+
+    // ✅ Retornar datos para que el frontend pueda procesar el pago
+    return {
+      suscripcionAnterior: {
+        id: resultado.suscripcionAnterior.id,
+        plan: resultado.suscripcionAnterior.plan?.nombre,
+        estado: 'CANCELADA'
+      },
+      nuevaSuscripcion: {
+        id: resultado.nuevaSuscripcion.id,
+        plan_id: nuevoPlanId,
+        plan_nombre: resultado.nuevoPlan.nombre,
+        estado: 'PENDIENTE_PAGO', 
+        fecha_inicio: resultado.nuevaSuscripcion.fecha_inicio,
+        fecha_vencimiento: resultado.nuevaSuscripcion.fecha_vencimiento,
+        monto: monto
+      },
+      ordenPago: {
+        id: resultado.ordenPago.id,
+        suscripcion_id: resultado.nuevaSuscripcion.id,
+        monto: monto,
+        estado: 'PENDIENTE'
+      }
+    };
+
+  } catch (error) {
+    logger.error(`❌ Error en SuscripcionService.cambiarPlan: ${error.message}`);
+    throw error;
+  }
+};
+
 const crearSuscripcion = async (pacienteId, planId, metodoPago) => {
   try {
     // 1. Validar que el plan existe y está activo
@@ -281,5 +407,6 @@ export default {
   crearSuscripcion,
   procesarPago,
   obtenerEstadoSuscripcion,
-  obtenerSuscripcionesPorPaciente
+  obtenerSuscripcionesPorPaciente,
+  cambiarPlan
 };

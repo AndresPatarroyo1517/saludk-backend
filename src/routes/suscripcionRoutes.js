@@ -143,5 +143,115 @@ router.get('/mis-suscripciones', requirePaciente, (req, res) => {
   req.params.pacienteId = req.user.paciente.id;
   return SuscripcionController.obtenerMisSuscripciones(req, res);
 });
+/**
+ * @swagger
+ * /suscripcion/cambiar-plan:
+ *   post:
+ *     summary: Cambiar el plan de suscripción de un paciente
+ *     tags: [Suscripciones]
+ *     description: Permite a un paciente cambiar su plan actual por uno nuevo. La autenticación se realiza mediante cookies de sesión.
+ *     security:
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - nuevoPlanId
+ *             properties:
+ *               nuevoPlanId:
+ *                 type: integer
+ *                 description: ID del nuevo plan al que se desea cambiar.
+ *                 example: 2
+ *               metodoPago:
+ *                 type: string
+ *                 description: Método de pago para la nueva suscripción (opcional).
+ *                 example: "tarjeta"
+ *     responses:
+ *       200:
+ *         description: Plan cambiado exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Plan cambiado exitosamente"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     suscripcionAnterior:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         plan:
+ *                           type: string
+ *                         estado:
+ *                           type: string
+ *                     nuevaSuscripcion:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         plan_id:
+ *                           type: integer
+ *                         plan_nombre:
+ *                           type: string
+ *                         estado:
+ *                           type: string
+ *                         fecha_inicio:
+ *                           type: string
+ *                           format: date-time
+ *                         fecha_vencimiento:
+ *                           type: string
+ *                           format: date-time
+ *                     ordenPago:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         monto:
+ *                           type: number
+ *                         estado:
+ *                           type: string
+ *       400:
+ *         description: Error de validación o plan no encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "No tienes una suscripción activa para cambiar"
+ *       500:
+ *         description: Error interno del servidor
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Error al cambiar el plan"
+ *                 error:
+ *                   type: string
+ *                   example: "Detalles del error"
+ */
+
+router.post('/cambiar-plan', requirePaciente, SuscripcionController.cambiarPlan);
 
 export default router;

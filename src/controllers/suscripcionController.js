@@ -196,6 +196,47 @@ class SuscripcionController {
     }
   }
 
+async cambiarPlan(req, res) {
+  try {
+    const pacienteId = req.user.paciente.id;
+    const { nuevoPlanId, metodoPago } = req.body;
+
+    // Validación básica
+    if (!nuevoPlanId) {
+      return res.status(400).json({
+        success: false,
+        message: 'El ID del nuevo plan es requerido'
+      });
+    }
+
+    // ✅ Usar el service para cambiar el plan
+    const resultado = await SuscripcionService.cambiarPlan(
+      pacienteId, 
+      nuevoPlanId, 
+      metodoPago
+    );
+
+    return res.json({
+      success: true,
+      message: 'Plan cambiado exitosamente',
+      data: resultado
+    });
+
+  } catch (error) {
+    logger.error('❌ Error al cambiar plan:', error);
+    
+    const statusCode = error.status || 500;
+    const message = error.message || 'Error al cambiar el plan';
+
+    return res.status(statusCode).json({
+      success: false,
+      message: message,
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+}
+
+
   /**
    * Obtiene el estado de una suscripción específica
    * GET /api/suscripcion/:suscripcionId

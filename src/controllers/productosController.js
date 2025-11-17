@@ -300,33 +300,40 @@ class ProductosController {
    * GET /api/productos/mis-compras?estado=&limit=&offset=
    */
   async obtenerMisCompras(req, res) {
-    try {
-      const pacienteId = req.user.paciente.id;
-      const { estado, limit = 20, offset = 0 } = req.query;
+  try {
+    const pacienteId = req.user.paciente.id;
+    const { estado, limit = 20, offset = 0 } = req.query;
 
-      const compras = await productosService.obtenerComprasPorPaciente(
-        pacienteId,
-        { estado, limit: parseInt(limit), offset: parseInt(offset) }
-      );
+    // ✅ Obtener compras con total real
+    const { compras, total } = await productosService.obtenerComprasPorPaciente(
+      pacienteId,
+      { 
+        estado, 
+        limit: parseInt(limit), 
+        offset: parseInt(offset),
+        incluirCarrito: false // ✅ Explícitamente excluir carritos
+      }
+    );
 
-      return res.json({
-        success: true,
-        data: {
-          compras,
-          total: compras.length,
-          limit: parseInt(limit),
-          offset: parseInt(offset)
-        }
-      });
+    return res.json({
+      success: true,
+      data: {
+        compras,
+        total, // ✅ Total REAL de registros
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        hasMore: (parseInt(offset) + compras.length) < total // ✅ Útil para paginación
+      }
+    });
 
-    } catch (error) {
-      logger.error('❌ ProductosController.obtenerMisCompras error: ' + error.message);
-      return res.status(error.status || 500).json({
-        success: false,
-        error: error.message
-      });
-    }
+  } catch (error) {
+    logger.error('❌ ProductosController.obtenerMisCompras error: ' + error.message);
+    return res.status(error.status || 500).json({
+      success: false,
+      error: error.message
+    });
   }
+}
 }
 
 export default new ProductosController();

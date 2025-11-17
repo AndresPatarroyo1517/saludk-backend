@@ -134,10 +134,30 @@ const updateEstado = async (id, nuevoEstado) => {
   }
 };
 
+const findActiveByPacienteId = async (pacienteId) => {
+  return await Suscripcion.findOne({
+    where: { 
+      paciente_id: pacienteId, 
+      estado: 'ACTIVA' 
+    },
+    include: [{ model: db.Plan, as: 'plan' }]
+  });
+};
+
+/**
+ * Crear suscripción con transacción
+ */
+const createWithTransaction = async (suscripcionData, transaction) => {
+  return await Suscripcion.create(suscripcionData, { transaction });
+};
+
+
 export default { 
   create, 
   findById, 
   findByIdWithPlan,
   findByPacienteId,
-  updateEstado
+  updateEstado,
+  findActiveByPacienteId,
+  createWithTransaction
 };

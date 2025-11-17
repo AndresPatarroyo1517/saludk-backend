@@ -657,14 +657,35 @@ const obtenerDetalleCompra = async (compraId) => {
 /**
  * Obtiene las compras de un paciente con filtros
  */
+// ✅ Estados válidos según DDL
+const ESTADOS_VALIDOS = ['CARRITO', 'PENDIENTE', 'PAGADA', 'PREPARANDO', 'EN_TRANSITO', 'ENTREGADA', 'CANCELADA'];
+
+// ✅ Estados que SÍ son compras reales (excluye CARRITO)
+const ESTADOS_HISTORIAL = ['PENDIENTE', 'PAGADA', 'PREPARANDO', 'EN_TRANSITO', 'ENTREGADA', 'CANCELADA'];
+
 const obtenerComprasPorPaciente = async (pacienteId, options = {}) => {
   try {
-    const { estado, limit = 20, offset = 0 } = options;
+    const { estado, limit = 20, offset = 0, incluirCarrito = false } = options;
+
+    // ✅ Validar límites
+    const limitNum = Math.min(Math.max(1, parseInt(limit)), 100); // Máximo 100
+    const offsetNum = Math.max(0, parseInt(offset));
 
     const where = { paciente_id: pacienteId };
+
     if (estado) {
+      // ✅ Validar que el estado sea válido
+      if (!ESTADOS_VALIDOS.includes(estado)) {
+        throw { status: 400, message: `Estado inválido. Valores permitidos: ${ESTADOS_VALIDOS.join(', ')}` };
+      }
       where.estado = estado;
+    } else if (!incluirCarrito) {
+      // ✅ Por defecto, excluir CARRITO del historial
+      where.estado = { [db.Sequelize.Op.in]: ESTADOS_HISTORIAL };
     }
+
+    // ✅ Contar total de registros para paginación correcta
+    const total = await db.Compra.count({ where });
 
     const compras = await db.Compra.findAll({
       where,
@@ -678,12 +699,12 @@ const obtenerComprasPorPaciente = async (pacienteId, options = {}) => {
           }]
         }
       ],
-      limit: parseInt(limit),
-      offset: parseInt(offset),
+      limit: limitNum,
+      offset: offsetNum,
       order: [['fecha_creacion', 'DESC']]
     });
 
-    return compras;
+    return { compras, total };
 
   } catch (error) {
     logger.error(`❌ Error obteniendo compras del paciente: ${error.message}`);
