@@ -681,7 +681,6 @@ class CitaController {
     }
   };
 
-
 }
 
 export default CitaController;

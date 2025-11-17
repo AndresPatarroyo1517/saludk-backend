@@ -314,56 +314,90 @@ class CitaRepository {
     const inicioMes = new Date(today.getFullYear(), today.getMonth(), 1);
     const finMes = new Date(today.getFullYear(), today.getMonth() + 1, 1);
 
-    // Total citas AGENDADAS hoy
-    const totalHoy = await this.Cita.count({
+    // HOY por estado
+    const totalHoyAgendadas = await this.Cita.count({
       where: {
         medico_id: medicoId,
         estado: 'AGENDADA',
-        fecha_hora: {
-          [Op.gte]: inicioHoy,
-          [Op.lt]: finHoy
-        }
+        fecha_hora: { [Op.gte]: inicioHoy, [Op.lt]: finHoy }
       }
     });
 
-    // Total COMPLETADAS este mes
+    const totalHoyConfirmadas = await this.Cita.count({
+      where: {
+        medico_id: medicoId,
+        estado: 'CONFIRMADA',
+        fecha_hora: { [Op.gte]: inicioHoy, [Op.lt]: finHoy }
+      }
+    });
+
+    // MES por estado
+    const totalMesAgendadas = await this.Cita.count({
+      where: {
+        medico_id: medicoId,
+        estado: 'AGENDADA',
+        fecha_hora: { [Op.gte]: inicioMes, [Op.lt]: finMes }
+      }
+    });
+
+    const totalMesConfirmadas = await this.Cita.count({
+      where: {
+        medico_id: medicoId,
+        estado: 'CONFIRMADA',
+        fecha_hora: { [Op.gte]: inicioMes, [Op.lt]: finMes }
+      }
+    });
+
+    // NUEVO: total completadas este mes
     const totalMesCompletadas = await this.Cita.count({
       where: {
         medico_id: medicoId,
         estado: 'COMPLETADA',
-        fecha_hora: {
-          [Op.gte]: inicioMes,
-          [Op.lt]: finMes
-        }
+        fecha_hora: { [Op.gte]: inicioMes, [Op.lt]: finMes }
       }
     });
 
-    // Próximas citas de hoy (lista detallada)
+    // Próximas citas de hoy
     const proximas = await this.Cita.findAll({
       where: {
         medico_id: medicoId,
-        estado: 'AGENDADA',
-        fecha_hora: {
-          [Op.gte]: inicioHoy,
-          [Op.lt]: finHoy
-        }
+        estado: { [Op.in]: ['APROBADA', 'CONFIRMADA'] },
+        fecha_hora: { [Op.gte]: inicioHoy, [Op.lt]: finHoy }
       },
       include: [
-        {
-          model: this.Paciente,
-          as: 'paciente',
-          attributes: ['id', 'nombres', 'apellidos']
-        }
+        { model: this.Paciente, as: 'paciente', attributes: ['id', 'nombres', 'apellidos'] }
+      ],
+      order: [['fecha_hora', 'ASC']]
+    });
+
+    // Citas del mes (para calendario)
+    const citasMes = await this.Cita.findAll({
+      where: {
+        medico_id: medicoId,
+        estado: { [Op.in]: ['APROBADA', 'CONFIRMADA'] },
+        fecha_hora: { [Op.gte]: inicioMes, [Op.lt]: finMes }
+      },
+      include: [
+        { model: this.Paciente, as: 'paciente', attributes: ['id', 'nombres', 'apellidos'] }
       ],
       order: [['fecha_hora', 'ASC']]
     });
 
     return {
-      total_hoy: totalHoy,
-      total_mes_completadas: totalMesCompletadas,
-      proximas_citas_hoy: proximas
+      total_hoy: {
+        AGENDADA: totalHoyAgendadas,
+        CONFIRMADA: totalHoyConfirmadas
+      },
+      total_mes: {
+        AGENDADA: totalMesAgendadas,
+        CONFIRMADA: totalMesConfirmadas
+      },
+      total_mes_completadas: totalMesCompletadas, // ← agregado
+      proximas_citas_hoy: proximas,
+      citas_mes: citasMes
     };
   }
+
 
 }
 
