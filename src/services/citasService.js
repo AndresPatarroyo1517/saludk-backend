@@ -686,7 +686,7 @@ class CitaService {
 
       proximas_citas_hoy: resultado.proximas_citas_hoy?.map(cita => ({
         id: cita.id,
-        hora: cita.fecha_hora.toISOString(),
+        fecha: cita.fecha_hora.toISOString(),
         estado: cita.estado,
         modalidad: cita.modalidad,
         paciente: cita.paciente ? `${cita.paciente.nombres} ${cita.paciente.apellidos}` : null

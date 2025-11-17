@@ -361,7 +361,7 @@ class CitaRepository {
     const proximas = await this.Cita.findAll({
       where: {
         medico_id: medicoId,
-        estado: { [Op.in]: ['APROBADA', 'CONFIRMADA'] },
+        estado: { [Op.in]: ['AGENDADA', 'CONFIRMADA'] },
         fecha_hora: { [Op.gte]: inicioHoy, [Op.lt]: finHoy }
       },
       include: [
@@ -374,7 +374,7 @@ class CitaRepository {
     const citasMes = await this.Cita.findAll({
       where: {
         medico_id: medicoId,
-        estado: { [Op.in]: ['APROBADA', 'CONFIRMADA'] },
+        estado: { [Op.in]: ['AGENDADA', 'CONFIRMADA'] },
         fecha_hora: { [Op.gte]: inicioMes, [Op.lt]: finMes }
       },
       include: [
