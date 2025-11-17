@@ -244,14 +244,6 @@ if (process.env.NODE_ENV === 'development') {
   });
 }
 
-app.get("/hola", (req, res) => {
-  res.json({
-    success: true,
-    message: 'Hola Mundo',
-    timestamp: new Date().toISOString(),
-  });
-});
-
 app.use(errorHandler);
 
 
