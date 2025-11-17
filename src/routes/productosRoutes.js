@@ -1,6 +1,6 @@
 import express from 'express';
 import ProductosController from '../controllers/productosController.js';
-import { requirePaciente } from '../middlewares/authMiddleware.js';
+import { requirePaciente, authMiddleware, checkRole } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
@@ -8,7 +8,7 @@ const router = express.Router();
  * @swagger
  * tags:
  *   name: Productos
- *   description: Catálogo de productos farmacéuticos
+ *   description: Catálogo de productos farmacéuticos y gestión de compras
  */
 
 // ==================== RUTA PÚBLICA ====================
@@ -17,35 +17,35 @@ const router = express.Router();
  * @swagger
  * /productos:
  *   get:
- *     summary: Listar productos disponibles (PÚBLICO)
- *     description: Consulta el catálogo de productos. No requiere autenticación.
+ *     summary: Consultar catálogo de productos (PÚBLICO)
  *     tags: [Productos]
  *     parameters:
  *       - in: query
  *         name: search
  *         schema:
  *           type: string
- *         description: Buscar por nombre o descripción
+ *         description: Término de búsqueda para filtrar productos
  *       - in: query
  *         name: category
  *         schema:
  *           type: string
- *         description: Filtrar por categoría
+ *         description: Categoría específica de productos
  *       - in: query
  *         name: page
  *         schema:
  *           type: integer
- *           default: 1
- *         description: Número de página
+ *           minimum: 1
+ *         description: Número de página para paginación
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
- *           default: 20
- *         description: Productos por página
+ *           minimum: 1
+ *           maximum: 100
+ *         description: Límite de productos por página
  *     responses:
  *       200:
- *         description: Lista de productos
+ *         description: Catálogo de productos obtenido exitosamente
  *         content:
  *           application/json:
  *             schema:
@@ -53,15 +53,40 @@ const router = express.Router();
  *               properties:
  *                 success:
  *                   type: boolean
+ *                   example: true
  *                 data:
- *                   type: object
- *                   properties:
- *                     productos:
- *                       type: array
- *                     paginacion:
- *                       type: object
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       nombre:
+ *                         type: string
+ *                       descripcion:
+ *                         type: string
+ *                       precio:
+ *                         type: number
+ *                       categoria:
+ *                         type: string
+ *                       disponible:
+ *                         type: boolean
+ *                       cantidad_disponible:
+ *                         type: integer
+ *       500:
+ *         description: Error interno del servidor
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
  */
-router.get('/', async (req, res) => ProductosController.consultarCatalogo(req, res));
+router.get('/', ProductosController.consultarCatalogo);
 
 // ==================== RUTAS PROTEGIDAS (Pacientes) ====================
 
@@ -69,13 +94,10 @@ router.get('/', async (req, res) => ProductosController.consultarCatalogo(req, r
  * @swagger
  * /productos/compra:
  *   post:
- *     summary: Procesar compra de productos (SOLO PACIENTES)
- *     description: |
- *       Procesa una compra de productos farmacéuticos para el paciente autenticado.
- *       Soporta código de promoción opcional para aplicar descuentos.
+ *     summary: Procesar una compra de productos (SOLO PACIENTES)
  *     tags: [Productos]
  *     security:
- *       - bearerAuth: []
+ *       - cookieAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -84,7 +106,7 @@ router.get('/', async (req, res) => ProductosController.consultarCatalogo(req, r
  *             type: object
  *             required:
  *               - items
- *               - metodoPago
+ *               - direccion_entrega_id
  *             properties:
  *               items:
  *                 type: array
@@ -93,52 +115,27 @@ router.get('/', async (req, res) => ProductosController.consultarCatalogo(req, r
  *                   type: object
  *                   required:
  *                     - productId
- *                     - cantidad
  *                   properties:
  *                     productId:
  *                       type: string
- *                       format: uuid
  *                       description: ID del producto
  *                     cantidad:
  *                       type: integer
  *                       minimum: 1
- *                       description: Cantidad a comprar
- *               codigoPromocion:
- *                 type: string
- *                 description: Código de promoción opcional (aplica descuento porcentual)
- *                 example: "CODIGO123"
+ *                       default: 1
  *               metodoPago:
  *                 type: string
- *                 enum: [TARJETA, PSE, CONSIGNACION]
- *                 default: TARJETA
- *                 description: Método de pago
+ *                 enum: [TARJETA_CREDITO, PSE, CONSIGNACION]
+ *                 default: TARJETA_CREDITO
+ *               codigoPromocion:
+ *                 type: string
+ *                 description: Código promocional opcional
  *               direccion_entrega_id:
  *                 type: string
- *                 format: uuid
  *                 description: ID de la dirección de entrega
- *           examples:
- *             compraSinPromocion:
- *               summary: Compra sin código promocional
- *               value:
- *                 items:
- *                   - productId: "123e4567-e89b-12d3-a456-426614174000"
- *                     cantidad: 2
- *                   - productId: "223e4567-e89b-12d3-a456-426614174001"
- *                     cantidad: 1
- *                 metodoPago: "TARJETA"
- *                 direccion_entrega_id: "323e4567-e89b-12d3-a456-426614174002"
- *             compraConPromocion:
- *               summary: Compra con código promocional
- *               value:
- *                 items:
- *                   - productId: "123e4567-e89b-12d3-a456-426614174000"
- *                     cantidad: 3
- *                 codigoPromocion: "DESCUENTO20"
- *                 metodoPago: "PSE"
- *                 direccion_entrega_id: "323e4567-e89b-12d3-a456-426614174002"
  *     responses:
  *       200:
- *         description: Compra procesada correctamente
+ *         description: Compra procesada exitosamente
  *         content:
  *           application/json:
  *             schema:
@@ -149,7 +146,6 @@ router.get('/', async (req, res) => ProductosController.consultarCatalogo(req, r
  *                   example: true
  *                 message:
  *                   type: string
- *                   example: "Compra procesada exitosamente"
  *                 data:
  *                   type: object
  *                   properties:
@@ -158,99 +154,289 @@ router.get('/', async (req, res) => ProductosController.consultarCatalogo(req, r
  *                       properties:
  *                         id:
  *                           type: string
- *                           format: uuid
- *                         monto_total:
+ *                         numero_orden:
+ *                           type: string
+ *                         paciente_id:
+ *                           type: string
+ *                         subtotal:
+ *                           type: number
+ *                         descuento:
+ *                           type: number
+ *                         total:
  *                           type: number
  *                         estado:
  *                           type: string
+ *                     ordenPago:
+ *                       type: object
  *                     montoFinal:
  *                       type: number
- *                       description: Monto final después de descuentos
  *                     descuentoAplicado:
  *                       type: number
- *                       description: Monto del descuento aplicado
  *                     promocion:
  *                       type: object
  *                       nullable: true
+ *                     stripe:
+ *                       type: object
  *                       properties:
- *                         codigoPromocion:
+ *                         clientSecret:
  *                           type: string
- *                         nombre:
+ *                         paymentIntentId:
  *                           type: string
- *                         porcentajeDescuento:
- *                           type: number
- *                         descuentoAplicado:
- *                           type: number
- *                         montoFinal:
- *                           type: number
+ *                     pse:
+ *                       type: object
+ *                     consignacion:
+ *                       type: object
  *       400:
- *         description: Código de promoción inválido o datos faltantes
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 error:
- *                   type: string
- *             examples:
- *               sinItems:
- *                 value:
- *                   success: false
- *                   error: "Debe proporcionar al menos un producto"
- *               promocionInvalida:
- *                 value:
- *                   success: false
- *                   error: "Código de promoción inválido o expirado"
- *       401:
- *         description: No autenticado
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: "Token no proporcionado"
+ *         description: Error en los datos de la compra
  *       403:
- *         description: Suscripción no activa o no es paciente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 error:
- *                   type: string
- *                   example: "Debe tener una suscripción activa para realizar compras"
+ *         description: Paciente sin suscripción activa
  *       409:
- *         description: Producto(s) no disponible(s) o sin stock
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 error:
- *                   type: string
- *                   example: "Producto sin stock suficiente"
+ *         description: Productos no disponibles en stock
  *       500:
  *         description: Error interno del servidor
  */
-router.post('/compra', requirePaciente, async (req, res) => {
-  // El pacienteId viene de req.user.paciente.id
-  req.body.pacienteId = req.user.paciente.id;
-  return ProductosController.procesarCompra(req, res);
-});
+router.post('/compra', requirePaciente, ProductosController.procesarCompra);
+
+/**
+ * @swagger
+ * /productos/compra/{compraId}/confirmar:
+ *   post:
+ *     summary: Confirmar compra después de pago exitoso
+ *     description: Cambia estado de CARRITO a PENDIENTE y decrementa stock
+ *     tags: [Productos]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: compraId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID de la compra a confirmar
+ *     responses:
+ *       200:
+ *         description: Compra confirmada exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     success:
+ *                       type: boolean
+ *                     compraId:
+ *                       type: string
+ *                     estado:
+ *                       type: string
+ *       400:
+ *         description: compraId requerido
+ *       404:
+ *         description: Compra no encontrada
+ *       500:
+ *         description: Error interno del servidor
+ */
+router.post('/compra/:compraId/confirmar', authMiddleware, ProductosController.confirmarCompra);
+
+/**
+ * @swagger
+ * /productos/compra/{compraId}/estado:
+ *   patch:
+ *     summary: Cambiar estado de una compra
+ *     description: |
+ *       Actualiza el estado siguiendo el flujo válido:
+ *       CARRITO → PENDIENTE → PREPARANDO → EN_TRANSITO → ENTREGADA
+ *     tags: [Productos]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: compraId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID de la compra
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - nuevoEstado
+ *             properties:
+ *               nuevoEstado:
+ *                 type: string
+ *                 enum: [PENDIENTE, PREPARANDO, EN_TRANSITO, ENTREGADA, CANCELADA]
+ *                 description: Nuevo estado de la compra
+ *     responses:
+ *       200:
+ *         description: Estado actualizado exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     success:
+ *                       type: boolean
+ *                     compraId:
+ *                       type: string
+ *                     estadoAnterior:
+ *                       type: string
+ *                     estadoNuevo:
+ *                       type: string
+ *       400:
+ *         description: Parámetros inválidos
+ *       404:
+ *         description: Compra no encontrada
+ *       409:
+ *         description: Transición de estado inválida
+ *       500:
+ *         description: Error interno del servidor
+ */
+router.patch('/compra/:compraId/estado', authMiddleware, ProductosController.cambiarEstadoCompra);
+
+/**
+ * @swagger
+ * /productos/compra/{compraId}/cancelar:
+ *   post:
+ *     summary: Cancelar una compra
+ *     description: Cancela una compra y restaura el stock si ya había sido confirmada
+ *     tags: [Productos]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: compraId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID de la compra a cancelar
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               motivo:
+ *                 type: string
+ *                 description: Motivo de la cancelación
+ *     responses:
+ *       200:
+ *         description: Compra cancelada exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     success:
+ *                       type: boolean
+ *                     compraId:
+ *                       type: string
+ *                     estadoAnterior:
+ *                       type: string
+ *                     estadoNuevo:
+ *                       type: string
+ *                     stockRestaurado:
+ *                       type: boolean
+ *       400:
+ *         description: compraId requerido
+ *       403:
+ *         description: No tiene permiso para cancelar esta compra
+ *       404:
+ *         description: Compra no encontrada
+ *       409:
+ *         description: No se puede cancelar una compra ya entregada
+ *       500:
+ *         description: Error interno del servidor
+ */
+router.post('/compra/:compraId/cancelar', authMiddleware, ProductosController.cancelarCompra);
+
+/**
+ * @swagger
+ * /productos/compra/{compraId}:
+ *   get:
+ *     summary: Obtener detalle completo de una compra
+ *     tags: [Productos]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: compraId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID de la compra
+ *     responses:
+ *       200:
+ *         description: Detalle de compra obtenido exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     numero_orden:
+ *                       type: string
+ *                     paciente_id:
+ *                       type: string
+ *                     estado:
+ *                       type: string
+ *                     subtotal:
+ *                       type: number
+ *                     descuento:
+ *                       type: number
+ *                     total:
+ *                       type: number
+ *                     productos:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                     direccion_entrega:
+ *                       type: object
+ *                     pagos:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *       400:
+ *         description: compraId requerido
+ *       403:
+ *         description: No tiene permiso para ver esta compra
+ *       404:
+ *         description: Compra no encontrada
+ *       500:
+ *         description: Error interno del servidor
+ */
+router.get('/compra/:compraId', authMiddleware, ProductosController.obtenerDetalleCompra);
 
 /**
  * @swagger
@@ -259,29 +445,56 @@ router.post('/compra', requirePaciente, async (req, res) => {
  *     summary: Obtener historial de compras del paciente autenticado
  *     tags: [Productos]
  *     security:
- *       - bearerAuth: []
+ *       - cookieAuth: []
  *     parameters:
  *       - in: query
  *         name: estado
  *         schema:
  *           type: string
- *           enum: [PENDIENTE, PAGADO, ENVIADO, ENTREGADO, CANCELADO]
+ *           enum: [CARRITO, PENDIENTE, PAGADA, PREPARANDO, EN_TRANSITO, ENTREGADA, CANCELADA]
+ *         description: Filtrar por estado de compra
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
+ *           minimum: 1
+ *           maximum: 100
  *           default: 20
+ *         description: Límite de compras por página
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           minimum: 0
+ *           default: 0
+ *         description: Offset para paginación
  *     responses:
  *       200:
- *         description: Historial de compras
- *       401:
- *         description: No autenticado
- *       403:
- *         description: No es paciente
+ *         description: Historial de compras obtenido exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     compras:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                     total:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     offset:
+ *                       type: integer
+ *       500:
+ *         description: Error interno del servidor
  */
-router.get('/mis-compras', requirePaciente, async (req, res) => {
-  req.query.pacienteId = req.user.paciente.id;
-  return ProductosController.obtenerMisCompras(req, res);
-});
+router.get('/mis-compras', requirePaciente, ProductosController.obtenerMisCompras);
 
 export default router;

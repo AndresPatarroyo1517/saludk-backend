@@ -29,27 +29,12 @@ class ProductosController {
   /**
    * Procesa una compra de productos (SOLO PACIENTES AUTENTICADOS)
    * POST /api/productos/compra
-   * 
-   * Body:
-   * {
-   *   items: [{ productId: "uuid", cantidad: 2 }],
-   *   metodoPago: "TARJETA" | "PSE" | "CONSIGNACION",
-   *   codigoPromocion: "CODIGO123" (opcional),
-   *   direccion_entrega_id: "uuid"
-   * }
    */
   async procesarCompra(req, res) {
     try {
-      // ✅ CAMBIO CRÍTICO: El pacienteId viene de req.body.pacienteId (inyectado por la ruta)
-      const pacienteId = req.body.pacienteId;
-      const { items, metodoPago = 'TARJETA', codigoPromocion = null, direccion_entrega_id } = req.body;
-
-      if (!pacienteId) {
-        return res.status(401).json({ 
-          success: false, 
-          error: 'Paciente no autenticado' 
-        });
-      }
+      // El pacienteId viene de req.user.paciente.id (authMiddleware + requirePaciente)
+      const pacienteId = req.user.paciente.id;
+      const { items, metodoPago = 'TARJETA_CREDITO', codigoPromocion = null, direccion_entrega_id } = req.body;
 
       if (!Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ 
@@ -114,7 +99,7 @@ class ProductosController {
         }
       };
 
-      // Para TARJETA: incluir clientSecret para Stripe
+      // Para TARJETA_CREDITO: incluir clientSecret para Stripe
       if (resumen.stripe) {
         response.data.stripe = resumen.stripe;
         response.message = 'Compra creada. Procede con el pago usando el clientSecret.';
@@ -146,19 +131,177 @@ class ProductosController {
   }
 
   /**
+   * Confirma una compra después del pago exitoso
+   * POST /api/productos/compra/:compraId/confirmar
+   */
+  async confirmarCompra(req, res) {
+    try {
+      const { compraId } = req.params;
+
+      if (!compraId) {
+        return res.status(400).json({
+          success: false,
+          error: 'compraId requerido'
+        });
+      }
+
+      logger.info(`✅ Confirmando compra ${compraId}`);
+
+      const resultado = await productosService.confirmarCompra(compraId);
+
+      return res.json({
+        success: true,
+        message: 'Compra confirmada exitosamente',
+        data: resultado
+      });
+
+    } catch (error) {
+      logger.error('❌ ProductosController.confirmarCompra error: ' + error.message);
+      return res.status(error.status || 500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Cambia el estado de una compra
+   * PATCH /api/productos/compra/:compraId/estado
+   */
+  async cambiarEstadoCompra(req, res) {
+    try {
+      const { compraId } = req.params;
+      const { nuevoEstado } = req.body;
+      const usuarioId = req.user?.userId;
+
+      if (!compraId) {
+        return res.status(400).json({
+          success: false,
+          error: 'compraId requerido'
+        });
+      }
+
+      if (!nuevoEstado) {
+        return res.status(400).json({
+          success: false,
+          error: 'nuevoEstado requerido'
+        });
+      }
+
+      logger.info(`🔄 Cambiando estado de compra ${compraId} a ${nuevoEstado}`);
+
+      const resultado = await productosService.cambiarEstadoCompra(compraId, nuevoEstado, usuarioId);
+
+      return res.json({
+        success: true,
+        message: `Estado actualizado a ${nuevoEstado}`,
+        data: resultado
+      });
+
+    } catch (error) {
+      logger.error('❌ ProductosController.cambiarEstadoCompra error: ' + error.message);
+      return res.status(error.status || 500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Cancela una compra
+   * POST /api/productos/compra/:compraId/cancelar
+   */
+  async cancelarCompra(req, res) {
+    try {
+      const { compraId } = req.params;
+      const { motivo } = req.body;
+      const usuarioId = req.user?.userId;
+      const pacienteId = req.user?.paciente?.id;
+
+      if (!compraId) {
+        return res.status(400).json({
+          success: false,
+          error: 'compraId requerido'
+        });
+      }
+
+      // Verificar que la compra pertenece al paciente (si es paciente quien cancela)
+      if (pacienteId) {
+        const compra = await productosService.obtenerDetalleCompra(compraId);
+        if (compra.paciente_id !== pacienteId) {
+          return res.status(403).json({
+            success: false,
+            error: 'No tienes permiso para cancelar esta compra'
+          });
+        }
+      }
+
+      logger.info(`❌ Cancelando compra ${compraId}. Motivo: ${motivo || 'No especificado'}`);
+
+      const resultado = await productosService.cancelarCompra(compraId, motivo, usuarioId);
+
+      return res.json({
+        success: true,
+        message: 'Compra cancelada exitosamente',
+        data: resultado
+      });
+
+    } catch (error) {
+      logger.error('❌ ProductosController.cancelarCompra error: ' + error.message);
+      return res.status(error.status || 500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Obtiene el detalle completo de una compra
+   * GET /api/productos/compra/:compraId
+   */
+  async obtenerDetalleCompra(req, res) {
+    try {
+      const { compraId } = req.params;
+      const pacienteId = req.user?.paciente?.id;
+
+      if (!compraId) {
+        return res.status(400).json({
+          success: false,
+          error: 'compraId requerido'
+        });
+      }
+
+      const compra = await productosService.obtenerDetalleCompra(compraId);
+
+      // Si es un paciente, verificar que la compra le pertenece
+      if (pacienteId && compra.paciente_id !== pacienteId) {
+        return res.status(403).json({
+          success: false,
+          error: 'No tienes permiso para ver esta compra'
+        });
+      }
+
+      return res.json({
+        success: true,
+        data: compra
+      });
+
+    } catch (error) {
+      logger.error('❌ ProductosController.obtenerDetalleCompra error: ' + error.message);
+      return res.status(error.status || 500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  /**
    * Obtiene el historial de compras del paciente autenticado
-   * GET /api/productos/mis-compras
+   * GET /api/productos/mis-compras?estado=&limit=&offset=
    */
   async obtenerMisCompras(req, res) {
     try {
-      const pacienteId = req.query.pacienteId; // Inyectado por la ruta
-
-      if (!pacienteId) {
-        return res.status(401).json({
-          success: false,
-          error: 'Paciente no autenticado'
-        });
-      }
+      const pacienteId = req.user.paciente.id;
 
       const { estado, limit = 20, offset = 0 } = req.query;
 
@@ -169,7 +312,12 @@ class ProductosController {
 
       return res.json({
         success: true,
-        data: compras
+        data: {
+          compras,
+          total: compras.length,
+          limit: parseInt(limit),
+          offset: parseInt(offset)
+        }
       });
 
     } catch (error) {
