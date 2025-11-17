@@ -1,21 +1,43 @@
 import productoRepository from '../repositories/productoRepository.js';
 import proveedorAdapter from '../jobs/proveedorAdapter.js';
-import PaymentService from './pagoService.js'; // ⚡ NUEVO: Integrar sistema de pagos
+import PaymentService from './pagoService.js';
 import db from '../models/index.js';
 import logger from '../utils/logger.js';
 import { sequelize } from '../database/database.js';
 import { v4 as uuidv4 } from 'uuid';
 import { QueryTypes } from 'sequelize';
+import notificationService from './notificationService.js';
 
 /**
- * ProductosService - Ahora integrado con sistema de pagos
+ * Estados válidos de una compra
  */
+const ESTADOS_COMPRA = {
+  CARRITO: 'CARRITO',
+  PENDIENTE: 'PENDIENTE', // Pago confirmado, esperando preparación
+  PAGADA: 'PAGADA', // Sinónimo de PENDIENTE (opcional)
+  PREPARANDO: 'PREPARANDO',
+  EN_TRANSITO: 'EN_TRANSITO',
+  ENTREGADA: 'ENTREGADA',
+  CANCELADA: 'CANCELADA'
+};
+
+/**
+ * Transiciones de estado válidas
+ */
+const TRANSICIONES_VALIDAS = {
+  CARRITO: ['PENDIENTE', 'CANCELADA'],
+  PENDIENTE: ['PREPARANDO', 'CANCELADA'],
+  PAGADA: ['PREPARANDO', 'CANCELADA'],
+  PREPARANDO: ['EN_TRANSITO', 'CANCELADA'],
+  EN_TRANSITO: ['ENTREGADA', 'CANCELADA'],
+  ENTREGADA: [],
+  CANCELADA: []
+};
 
 const consultarCatalogo = async (options = {}) => {
   const { search, category, page, limit } = options;
   const products = await productoRepository.findAll({ search, category, page, limit });
 
-  // Consultar disponibilidad externa (stock)
   const ids = products.map(p => p.id);
   const disponibilidadMap = await proveedorAdapter.consultarDisponibilidad(ids);
 
@@ -28,16 +50,14 @@ const consultarCatalogo = async (options = {}) => {
 
 /**
  * Procesa una compra de productos
- * AHORA: Crea la compra + genera orden de pago automáticamente
+ * Crea la compra + genera orden de pago automáticamente
  */
-const procesarCompra = async (pacienteId, items = [], metodoPago = 'TARJETA') => {
+const procesarCompra = async (pacienteId, items = [], metodoPago = 'TARJETA_CREDITO', direccion_entrega_id) => {
   try {
     // 1) Verificar suscripción activa
     const today = new Date().toISOString().slice(0,10);
     const suscripcion = await db.Suscripcion.findOne({
-      where: {
-        paciente_id: pacienteId,
-      }
+      where: { paciente_id: pacienteId }
     });
 
     if (!suscripcion) {
@@ -59,13 +79,12 @@ const procesarCompra = async (pacienteId, items = [], metodoPago = 'TARJETA') =>
     const unavailable = [];
     let total = 0;
 
-    // Obtener detalles de productos para calcular precio
     const catalog = await productoRepository.findAll({});
     const catalogMap = Object.fromEntries(catalog.map(p => [p.id, p]));
 
     for (const it of items) {
       const stock = disponibilidadMap[it.productId] ?? (catalogMap[it.productId]?.cantidad_disponible ?? 0);
-      if ((stock) < (it.cantidad || 1)) {
+      if (stock < (it.cantidad || 1)) {
         unavailable.push({ productId: it.productId, requested: it.cantidad || 1, available: stock });
       } else {
         const price = catalogMap[it.productId]?.precio ?? 0;
@@ -80,7 +99,7 @@ const procesarCompra = async (pacienteId, items = [], metodoPago = 'TARJETA') =>
       throw e;
     }
 
-    // 3) Persistir compra y items dentro de una transacción
+    // 3) Persistir compra y items
     const t = await sequelize.transaction();
     try {
       const compraId = uuidv4();
@@ -91,8 +110,14 @@ const procesarCompra = async (pacienteId, items = [], metodoPago = 'TARJETA') =>
       const totalFinal = subtotal - descuento;
 
       const insertCompraSql = `
-        INSERT INTO public.compra (id, paciente_id, numero_orden, subtotal, descuento, total, estado, tipo_entrega, fecha_creacion)
-        VALUES (:id, :pacienteId, :numeroOrden, :subtotal, :descuento, :total, :estado, :tipoEntrega, now())
+        INSERT INTO public.compra (
+          id, paciente_id, numero_orden, subtotal, descuento, total, 
+          estado, tipo_entrega, direccion_entrega_id, fecha_creacion
+        )
+        VALUES (
+          :id, :pacienteId, :numeroOrden, :subtotal, :descuento, :total, 
+          :estado, :tipoEntrega, :direccionEntregaId, now()
+        )
       `;
 
       await sequelize.query(insertCompraSql, {
@@ -103,8 +128,9 @@ const procesarCompra = async (pacienteId, items = [], metodoPago = 'TARJETA') =>
           subtotal,
           descuento,
           total: totalFinal,
-          estado: 'CARRITO', // ⚡ CAMBIO: Empieza en CARRITO, cambiará a PENDIENTE cuando pague
+          estado: 'CARRITO',
           tipoEntrega: 'DOMICILIO',
+          direccionEntregaId: direccion_entrega_id
         },
         transaction: t,
       });
@@ -118,8 +144,14 @@ const procesarCompra = async (pacienteId, items = [], metodoPago = 'TARJETA') =>
 
         const compraProductoId = uuidv4();
         const insertItemSql = `
-          INSERT INTO public.compra_producto (id, compra_id, producto_id, cantidad, precio_unitario, descuento_aplicado, subtotal)
-          VALUES (:id, :compraId, :productoId, :cantidad, :precioUnitario, :descuentoAplicado, :subtotal)
+          INSERT INTO public.compra_producto (
+            id, compra_id, producto_id, cantidad, precio_unitario, 
+            descuento_aplicado, subtotal
+          )
+          VALUES (
+            :id, :compraId, :productoId, :cantidad, :precioUnitario, 
+            :descuentoAplicado, :subtotal
+          )
         `;
 
         await sequelize.query(insertItemSql, {
@@ -134,16 +166,12 @@ const procesarCompra = async (pacienteId, items = [], metodoPago = 'TARJETA') =>
           },
           transaction: t,
         });
-
-        // ⚡ NUEVO: Ya no decrementamos stock aquí, se hará cuando el pago sea confirmado
-        // Esto evita reservar stock de pagos que nunca se completan
       }
 
       await t.commit();
-
       logger.info(`✅ Compra ${compraId} creada exitosamente. Total: $${totalFinal}`);
 
-      // 4) ⚡ NUEVO: Crear orden de pago automáticamente
+      // 4) Crear orden de pago automáticamente
       const resultadoPago = await PaymentService.crearOrdenPago({
         metodoPago: metodoPago,
         tipoOrden: 'COMPRA',
@@ -160,7 +188,7 @@ const procesarCompra = async (pacienteId, items = [], metodoPago = 'TARJETA') =>
 
       logger.info(`✅ Orden de pago creada: ${resultadoPago.orden.id} | Método: ${metodoPago}`);
 
-      // 5) Preparar respuesta completa
+      // 5) Preparar respuesta
       const resumen = {
         compra: {
           id: compraId,
@@ -177,7 +205,7 @@ const procesarCompra = async (pacienteId, items = [], metodoPago = 'TARJETA') =>
           total: totalFinal,
           moneda: 'COP',
           fecha: new Date().toISOString(),
-          estado: 'CARRITO', // Esperando pago
+          estado: 'CARRITO',
         },
         ordenPago: {
           id: resultadoPago.orden.id,
@@ -188,8 +216,7 @@ const procesarCompra = async (pacienteId, items = [], metodoPago = 'TARJETA') =>
         }
       };
 
-      // Agregar datos específicos según método de pago
-      if (metodoPago === 'TARJETA' && resultadoPago.paymentIntent) {
+      if (metodoPago === 'TARJETA_CREDITO' && resultadoPago.paymentIntent) {
         resumen.stripe = {
           clientSecret: resultadoPago.paymentIntent.client_secret,
           paymentIntentId: resultadoPago.paymentIntent.id
@@ -221,15 +248,15 @@ const procesarCompra = async (pacienteId, items = [], metodoPago = 'TARJETA') =>
 };
 
 /**
- * ⚡ NUEVO: Confirma una compra después de que el pago sea exitoso
- * Este método se llamará desde el webhook o confirmación de pago
+ * Confirma una compra después de que el pago sea exitoso
+ * Cambia estado de CARRITO a PENDIENTE y decrementa stock
  */
 const confirmarCompra = async (compraId) => {
   try {
     const t = await sequelize.transaction();
 
     try {
-      // 1. Actualizar estado de compra a PENDIENTE (esperando preparación)
+      // 1. Actualizar estado de compra a PENDIENTE
       const updateCompraSql = `
         UPDATE public.compra 
         SET estado = 'PENDIENTE', fecha_pago = now(), fecha_actualizacion = now()
@@ -240,7 +267,7 @@ const confirmarCompra = async (compraId) => {
         transaction: t,
       });
 
-      // 2. Decrementar stock de los productos
+      // 2. Decrementar stock
       const getItemsSql = `
         SELECT producto_id, cantidad 
         FROM public.compra_producto 
@@ -266,7 +293,6 @@ const confirmarCompra = async (compraId) => {
           transaction: t,
         });
 
-        // Verificar stock restante
         const checkSql = `SELECT cantidad_disponible FROM public.stock WHERE producto_id = :productoId`;
         const rows = await sequelize.query(checkSql, { 
           replacements: { productoId: item.producto_id }, 
@@ -282,8 +308,11 @@ const confirmarCompra = async (compraId) => {
 
       await t.commit();
       logger.info(`✅ Compra ${compraId} confirmada y stock actualizado`);
+
+      // 3. Enviar notificación al paciente
+      await enviarNotificacionCambioEstado(compraId, 'PENDIENTE');
       
-      return { success: true, compraId };
+      return { success: true, compraId, estado: 'PENDIENTE' };
 
     } catch (txErr) {
       await t.rollback();
@@ -296,8 +325,346 @@ const confirmarCompra = async (compraId) => {
   }
 };
 
+/**
+ * Cambia el estado de una compra
+ */
+const cambiarEstadoCompra = async (compraId, nuevoEstado, usuarioId = null) => {
+  try {
+    // Validar que el nuevo estado sea válido
+    if (!Object.values(ESTADOS_COMPRA).includes(nuevoEstado)) {
+      throw new Error(`Estado inválido: ${nuevoEstado}`);
+    }
+
+    // Obtener compra actual
+    const compra = await db.Compra.findByPk(compraId);
+    
+    if (!compra) {
+      const e = new Error('Compra no encontrada');
+      e.status = 404;
+      throw e;
+    }
+
+    const estadoActual = compra.estado;
+
+    // Validar transición de estado
+    if (!TRANSICIONES_VALIDAS[estadoActual]?.includes(nuevoEstado)) {
+      throw new Error(
+        `Transición de estado inválida: ${estadoActual} -> ${nuevoEstado}`
+      );
+    }
+
+    // Actualizar estado
+    const updateSql = `
+      UPDATE public.compra 
+      SET estado = :nuevoEstado, fecha_actualizacion = now()
+      WHERE id = :compraId
+    `;
+    
+    await sequelize.query(updateSql, {
+      replacements: { compraId, nuevoEstado }
+    });
+
+    // Actualizar fecha_entrega si el estado es ENTREGADA
+    if (nuevoEstado === 'ENTREGADA') {
+      const updateFechaEntregaSql = `
+        UPDATE public.compra 
+        SET fecha_entrega = now()
+        WHERE id = :compraId
+      `;
+      await sequelize.query(updateFechaEntregaSql, {
+        replacements: { compraId }
+      });
+    }
+
+    logger.info(`✅ Compra ${compraId}: ${estadoActual} -> ${nuevoEstado}`);
+
+    // Enviar notificación
+    await enviarNotificacionCambioEstado(compraId, nuevoEstado);
+
+    // Registrar en auditoría si se proporciona usuarioId
+    if (usuarioId) {
+      await registrarAuditoria(usuarioId, 'CAMBIO_ESTADO_COMPRA', {
+        compra_id: compraId,
+        estado_anterior: estadoActual,
+        estado_nuevo: nuevoEstado
+      });
+    }
+
+    return { 
+      success: true, 
+      compraId, 
+      estadoAnterior: estadoActual,
+      estadoNuevo: nuevoEstado 
+    };
+
+  } catch (error) {
+    logger.error(`❌ Error cambiando estado de compra: ${error.message}`);
+    throw error;
+  }
+};
+
+/**
+ * Cancela una compra y restaura el stock si ya fue confirmada
+ */
+const cancelarCompra = async (compraId, motivo = null, usuarioId = null) => {
+  try {
+    const t = await sequelize.transaction();
+
+    try {
+      const compra = await db.Compra.findByPk(compraId, { transaction: t });
+      
+      if (!compra) {
+        throw new Error('Compra no encontrada');
+      }
+
+      const estadoActual = compra.estado;
+
+      // No permitir cancelar si ya está entregada
+      if (estadoActual === 'ENTREGADA') {
+        throw new Error('No se puede cancelar una compra ya entregada');
+      }
+
+      // Si la compra ya había sido confirmada, restaurar stock
+      if (['PENDIENTE', 'PAGADA', 'PREPARANDO', 'EN_TRANSITO'].includes(estadoActual)) {
+        const getItemsSql = `
+          SELECT producto_id, cantidad 
+          FROM public.compra_producto 
+          WHERE compra_id = :compraId
+        `;
+        const items = await sequelize.query(getItemsSql, {
+          replacements: { compraId },
+          type: QueryTypes.SELECT,
+          transaction: t,
+        });
+
+        for (const item of items) {
+          const updateStockSql = `
+            UPDATE public.stock
+            SET cantidad_disponible = cantidad_disponible + :cantidad
+            WHERE producto_id = :productoId
+          `;
+          await sequelize.query(updateStockSql, {
+            replacements: { 
+              productoId: item.producto_id, 
+              cantidad: item.cantidad 
+            },
+            transaction: t,
+          });
+        }
+
+        logger.info(`✅ Stock restaurado para compra ${compraId}`);
+      }
+
+      // Actualizar estado a CANCELADA
+      const updateSql = `
+        UPDATE public.compra 
+        SET estado = 'CANCELADA', 
+            notas_entrega = COALESCE(notas_entrega, '') || ' | Motivo cancelación: ' || :motivo,
+            fecha_actualizacion = now()
+        WHERE id = :compraId
+      `;
+      
+      await sequelize.query(updateSql, {
+        replacements: { 
+          compraId, 
+          motivo: motivo || 'No especificado' 
+        },
+        transaction: t
+      });
+
+      await t.commit();
+
+      logger.info(`✅ Compra ${compraId} cancelada. Estado anterior: ${estadoActual}`);
+
+      // Enviar notificación
+      await enviarNotificacionCambioEstado(compraId, 'CANCELADA', motivo);
+
+      // Registrar en auditoría
+      if (usuarioId) {
+        await registrarAuditoria(usuarioId, 'CANCELACION_COMPRA', {
+          compra_id: compraId,
+          estado_anterior: estadoActual,
+          motivo
+        });
+      }
+
+      return { 
+        success: true, 
+        compraId, 
+        estadoAnterior: estadoActual,
+        estadoNuevo: 'CANCELADA',
+        stockRestaurado: ['PENDIENTE', 'PAGADA', 'PREPARANDO', 'EN_TRANSITO'].includes(estadoActual)
+      };
+
+    } catch (txErr) {
+      await t.rollback();
+      throw txErr;
+    }
+
+  } catch (error) {
+    logger.error(`❌ Error cancelando compra: ${error.message}`);
+    throw error;
+  }
+};
+
+/**
+ * Obtiene el detalle completo de una compra
+ */
+const obtenerDetalleCompra = async (compraId) => {
+  try {
+    const compra = await db.Compra.findByPk(compraId, {
+      include: [
+        {
+          model: db.CompraProducto,
+          as: 'productos',
+          include: [{
+            model: db.ProductoFarmaceutico,
+            as: 'producto'
+          }]
+        },
+        {
+          model: db.Direccion,
+          as: 'direccion_entrega'
+        },
+        {
+          model: db.OrdenPago,
+          as: 'pagos'
+        }
+      ]
+    });
+
+    if (!compra) {
+      const e = new Error('Compra no encontrada');
+      e.status = 404;
+      throw e;
+    }
+
+    return compra;
+
+  } catch (error) {
+    logger.error(`❌ Error obteniendo detalle de compra: ${error.message}`);
+    throw error;
+  }
+};
+
+/**
+ * Obtiene las compras de un paciente con filtros
+ */
+const obtenerComprasPorPaciente = async (pacienteId, options = {}) => {
+  try {
+    const { estado, limit = 20, offset = 0 } = options;
+
+    const where = { paciente_id: pacienteId };
+    if (estado) {
+      where.estado = estado;
+    }
+
+    const compras = await db.Compra.findAll({
+      where,
+      include: [
+        {
+          model: db.CompraProducto,
+          as: 'productos',
+          include: [{
+            model: db.ProductoFarmaceutico,
+            as: 'producto'
+          }]
+        }
+      ],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      order: [['fecha_creacion', 'DESC']]
+    });
+
+    return compras;
+
+  } catch (error) {
+    logger.error(`❌ Error obteniendo compras del paciente: ${error.message}`);
+    throw error;
+  }
+};
+
+/**
+ * Envía notificación al paciente sobre cambio de estado
+ */
+const enviarNotificacionCambioEstado = async (compraId, nuevoEstado, motivo = null) => {
+  try {
+    const compra = await db.Compra.findByPk(compraId, {
+      include: [
+        {
+          model: db.Paciente,
+          as: 'paciente',
+          include: [{ model: db.Usuario, as: 'usuario' }]
+        }
+      ]
+    });
+
+    if (!compra || !compra.paciente?.usuario?.email) {
+      logger.warn(`No se pudo enviar notificación para compra ${compraId}`);
+      return;
+    }
+
+    const mensajes = {
+      PENDIENTE: {
+        asunto: '✅ Pago confirmado - Orden en proceso',
+        mensaje: `Tu pago ha sido confirmado exitosamente. Orden: ${compra.numero_orden}`
+      },
+      PREPARANDO: {
+        asunto: '📦 Tu pedido se está preparando',
+        mensaje: `Estamos preparando tu pedido. Orden: ${compra.numero_orden}`
+      },
+      EN_TRANSITO: {
+        asunto: '🚚 Tu pedido está en camino',
+        mensaje: `Tu pedido ha sido enviado y está en tránsito. Orden: ${compra.numero_orden}`
+      },
+      ENTREGADA: {
+        asunto: '🎉 Tu pedido ha sido entregado',
+        mensaje: `Tu pedido ha sido entregado exitosamente. Orden: ${compra.numero_orden}`
+      },
+      CANCELADA: {
+        asunto: '❌ Tu pedido ha sido cancelado',
+        mensaje: `Tu pedido ha sido cancelado. Orden: ${compra.numero_orden}${motivo ? `. Motivo: ${motivo}` : ''}`
+      }
+    };
+
+    const notif = mensajes[nuevoEstado];
+    if (notif) {
+      await notificationService.enviarEmail({
+        destinatarios: [compra.paciente.usuario.email],
+        asunto: notif.asunto,
+        mensaje: notif.mensaje
+      });
+
+      logger.info(`📧 Notificación enviada a ${compra.paciente.usuario.email} - Estado: ${nuevoEstado}`);
+    }
+
+  } catch (error) {
+    logger.warn(`Error enviando notificación: ${error.message}`);
+  }
+};
+
+/**
+ * Registra acción en auditoría
+ */
+const registrarAuditoria = async (usuarioId, accion, detalles) => {
+  try {
+    await db.Auditoria.create({
+      usuario_id: usuarioId,
+      accion,
+      detalles,
+      fecha: new Date()
+    });
+  } catch (error) {
+    logger.warn(`Error registrando auditoría: ${error.message}`);
+  }
+};
+
 export default { 
   consultarCatalogo, 
   procesarCompra,
-  confirmarCompra 
+  confirmarCompra,
+  cambiarEstadoCompra,
+  cancelarCompra,
+  obtenerDetalleCompra,
+  obtenerComprasPorPaciente
 };
