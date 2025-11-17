@@ -351,6 +351,72 @@ class CitaController {
   };
 
   /**
+   * GET /citas/medico/:medicoId
+   * Obtiene todas las citas de un medico con filtros de fecha
+   * NOTA: Me copie del metodo de arriba
+   */
+  obtenerCitasMedico = async (req, res) => {
+    try {
+      let { medicoId } = req.params;
+      const { rango, ordenar_por } = req.query;
+
+      try {
+        logger.info(`obtenerCitasMedico - medicoId=${medicoId} query=${JSON.stringify(req.query)}`);
+      } catch (err) {
+        logger.debug('obtenerCitasMedico - no se pudo serializar query params');
+      }
+
+      if (!medicoId) {
+        return res.status(400).json({
+          error: 'El parámetro medicoId es requerido'
+        });
+      }
+
+      // Buscar médico
+      let medico = await db.Medico.findByPk(medicoId);
+      if (!medico) {
+        medico = await db.Medico.findOne({ where: { usuario_id: medicoId } });
+        if (medico) medicoId = medico.id;
+      }
+
+      if (!medico) {
+        return res.status(404).json({
+          error: 'Médico no encontrado'
+        });
+      }
+
+      const filtros = {
+        rango: rango || null,     // hoy | semana | mes
+        ordenar_por: ordenar_por || 'fecha_hora'
+      };
+
+      const citas = await this.service.obtenerCitasMedico(medicoId, filtros);
+
+      try {
+        logger.info(`obtenerCitasMedico - medicoId=${medicoId} total_citas_recuperadas=${citas.length}`);
+      } catch (err) {
+        logger.debug('obtenerCitasMedico - no se pudo loggear cantidad de citas');
+      }
+
+      res.status(200).json({
+        success: true,
+        data: {
+          medico_id: medicoId,
+          total_citas: citas.length,
+          citas
+        }
+      });
+
+    } catch (error) {
+      logger.error('Error al obtener citas del médico: citasController.js - ' + error.message);
+      res.status(500).json({
+        error: 'Error al obtener las citas del médico',
+        mensaje: error.message
+      });
+    }
+  };
+
+  /**
    * PUT /citas/:citaId
    * Edita una cita existente - acepta CUALQUIER campo editable
    * Body: { fecha_hora?, modalidad?, motivo_consulta?, notas_consulta?, enlace_virtual?, ... }
@@ -506,6 +572,44 @@ class CitaController {
       });
     }
   };
+
+  /**
+   * GET /medico/:medicoId/estadisticas
+   * 
+   */
+  obtenerEstadisticasCitasMedico = async (req, res) => {
+    try {
+      let { medicoId } = req.params;
+
+      if (!medicoId) {
+        return res.status(400).json({ error: 'El parámetro medicoId es requerido' });
+      }
+
+      let medico = await db.Medico.findByPk(medicoId);
+
+      if (!medico) {
+        medico = await db.Medico.findOne({ where: { usuario_id: medicoId } });
+        if (medico) medicoId = medico.id;
+      }
+
+      if (!medico) {
+        return res.status(404).json({ error: 'Médico no encontrado' });
+      }
+
+      const data = await this.service.obtenerEstadisticasCitasMedico(medicoId);
+
+      res.status(200).json({ success: true, data });
+
+    } catch (error) {
+      logger.error('Error al obtener estadísticas de citas del médico: ' + error.message);
+      res.status(500).json({
+        error: 'Error al obtener estadísticas de citas del médico',
+        mensaje: error.message
+      });
+    }
+  };
+
+
 }
 
 export default CitaController;

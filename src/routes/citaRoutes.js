@@ -778,6 +778,105 @@ router.get('/paciente/:pacienteId', controller.obtenerCitasPaciente);
 
 /**
  * @swagger
+ * /citas/medico/{medicoId}:
+ *   get:
+ *     summary: Listar las citas agendadas del médico
+ *     description: 
+ *       Retorna las citas en estado AGENDADA filtradas por rango de tiempo (hoy, semana o mes).
+ *     tags: [Citas]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: medicoId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: UUID del médico o su usuario_id
+ *         example: "123e4567-e89b-12d3-a456-426614174000"
+ *       - in: query
+ *         name: rango
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [hoy, semana, mes]
+ *         description: Filtro opcional por rango de fechas
+ *         example: "hoy"
+ *       - in: query
+ *         name: ordenar_por
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [fecha_hora, fecha_hora_asc]
+ *         description: Orden de las citas
+ *         example: "fecha_hora"
+ *     responses:
+ *       200:
+ *         description: Citas recuperadas exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     medico_id:
+ *                       type: string
+ *                     total_citas:
+ *                       type: integer
+ *                       example: 5
+ *                     citas:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                             format: uuid
+ *                           paciente_id:
+ *                             type: string
+ *                           medico_id:
+ *                             type: string
+ *                           paciente:
+ *                             type: object
+ *                             properties:
+ *                               id:
+ *                                 type: string
+ *                               nombres:
+ *                                 type: string
+ *                               apellidos:
+ *                                 type: string
+ *                           fecha_hora:
+ *                             type: string
+ *                           modalidad:
+ *                             type: string
+ *                           estado:
+ *                             type: string
+ *                             example: "AGENDADA"
+ *                           motivo_consulta:
+ *                             type: string
+ *                           enlace_virtual:
+ *                             type: string
+ *                           notas_consulta:
+ *                             type: string
+ *                           costo_pagado:
+ *                             type: string
+ *       400:
+ *         description: Parámetro faltante
+ *       404:
+ *         description: Médico no encontrado
+ *       500:
+ *         description: Error interno del servidor
+ */
+router.get('/medico/:medicoId', authMiddleware, controller.obtenerCitasMedico);
+
+/**
+ * @swagger
  * /citas/{citaId}/cancelar:
  *   delete:
  *     summary: Cancelar una cita médica
@@ -1103,4 +1202,71 @@ router.put('/:citaId', controller.editarCita);
  */
 router.delete('/:citaId/cancelar', authMiddleware, controller.cancelarCita);
 
+/**
+ * @swagger
+ * /citas/medico/{medicoId}/estadisticas:
+ *   get:
+ *     summary: Obtener estadísticas y citas del médico
+ *     description: 
+ *       Devuelve las citas del médico programadas para el día de hoy 
+ *       y el total de citas COMPLETADAS en el mes actual.
+ *     tags: [Citas]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: medicoId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: UUID del médico o su usuario_id
+ *     responses:
+ *       200:
+ *         description: Estadísticas obtenidas correctamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     medico_id:
+ *                       type: string
+ *                       format: uuid
+ *                     citas_hoy:
+ *                       type: array
+ *                       description: Lista de citas AGENDADAS para el día de hoy
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                             format: uuid
+ *                           paciente_id:
+ *                             type: string
+ *                           fecha_hora:
+ *                             type: string
+ *                             format: date-time
+ *                           estado:
+ *                             type: string
+ *                             example: "AGENDADA"
+ *                           modalidad:
+ *                             type: string
+ *                             example: "PRESENCIAL"
+ *                     total_completadas_mes:
+ *                       type: integer
+ *                       example: 7
+ *       400:
+ *         description: Parámetro faltante
+ *       404:
+ *         description: Médico no encontrado
+ *       500:
+ *         description: Error interno del servidor
+ */
+router.get('/medico/:medicoId/estadisticas', authMiddleware, controller.obtenerEstadisticasCitasMedico);
 export default router;

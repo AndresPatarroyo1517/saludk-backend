@@ -7,6 +7,7 @@ class CitaRepository {
     this.DisponibilidadMedico = db.DisponibilidadMedico;
     this.Cita = db.Cita;
     this.Medico = db.Medico;
+    this.Paciente = db.Paciente;
   }
 
   /**
@@ -160,6 +161,66 @@ class CitaRepository {
   }
 
   /**
+   * Obtiene todas las citas de un medico con rango de fechas
+   */
+  async obtenerCitasMedico(medicoId, rango = null, ordenarPor = 'fecha_hora') {
+    const whereClause = {
+      medico_id: medicoId,
+      estado: 'AGENDADA'
+    };
+
+    const today = new Date();
+    let start = null;
+    let end = null;
+
+    if (rango === 'hoy') {
+      start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      end = new Date(start);
+      end.setDate(end.getDate() + 1);
+    }
+
+    if (rango === 'semana') {
+      start = new Date(today);
+      start.setDate(start.getDate() - start.getDay());
+      start.setHours(0, 0, 0, 0);
+
+      end = new Date(start);
+      end.setDate(end.getDate() + 7);
+    }
+
+    if (rango === 'mes') {
+      start = new Date(today.getFullYear(), today.getMonth(), 1);
+      end = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    }
+
+    if (start && end) {
+      whereClause.fecha_hora = {
+        [Op.gte]: start,
+        [Op.lte]: end
+      };
+    }
+
+    let order = [['fecha_hora', 'DESC']];
+    if (ordenarPor === 'fecha_hora_asc') {
+      order = [['fecha_hora', 'ASC']];
+    }
+
+    const citas = await this.Cita.findAll({
+      where: whereClause,
+      include: [
+        {
+          association: 'paciente',
+          attributes: ['id', 'nombres', 'apellidos']
+        }
+      ],
+      order,
+      raw: false
+    });
+
+    return citas;
+  }
+
+  /**
    * Obtiene una cita por su ID
    */
   async obtenerCitaPorId(citaId) {
@@ -229,6 +290,67 @@ class CitaRepository {
 
     return citaCreada.toJSON ? citaCreada.toJSON() : citaCreada;
   }
+
+  async obtenerEstadisticasCitasMedico(medicoId) {
+    const today = new Date();
+
+    const inicioHoy = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const finHoy = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+
+    const inicioMes = new Date(today.getFullYear(), today.getMonth(), 1);
+    const finMes = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+
+    // Total citas AGENDADAS hoy
+    const totalHoy = await this.Cita.count({
+      where: {
+        medico_id: medicoId,
+        estado: 'AGENDADA',
+        fecha_hora: {
+          [Op.gte]: inicioHoy,
+          [Op.lt]: finHoy
+        }
+      }
+    });
+
+    // Total COMPLETADAS este mes
+    const totalMesCompletadas = await this.Cita.count({
+      where: {
+        medico_id: medicoId,
+        estado: 'COMPLETADA',
+        fecha_hora: {
+          [Op.gte]: inicioMes,
+          [Op.lt]: finMes
+        }
+      }
+    });
+
+    // Próximas citas de hoy (lista detallada)
+    const proximas = await this.Cita.findAll({
+      where: {
+        medico_id: medicoId,
+        estado: 'AGENDADA',
+        fecha_hora: {
+          [Op.gte]: inicioHoy,
+          [Op.lt]: finHoy
+        }
+      },
+      include: [
+        {
+          model: this.Paciente,
+          as: 'paciente',
+          attributes: ['id', 'nombres', 'apellidos']
+        }
+      ],
+      order: [['fecha_hora', 'ASC']]
+    });
+
+    return {
+      total_hoy: totalHoy,
+      total_mes_completadas: totalMesCompletadas,
+      proximas_citas_hoy: proximas
+    };
+  }
+
 }
 
 export default CitaRepository;

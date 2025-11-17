@@ -461,6 +461,38 @@ class CitaService {
     }));
   }
 
+  async obtenerCitasMedico(medicoId, filtros = {}) {
+    const { rango, ordenar_por = 'fecha_hora' } = filtros;
+
+    const citas = await this.repository.obtenerCitasMedico(
+      medicoId,
+      rango,
+      ordenar_por
+    );
+
+    if (citas.length === 0) return [];
+
+    return citas.map(cita => ({
+      id: cita.id,
+      paciente_id: cita.paciente_id,
+      medico_id: cita.medico_id,
+      paciente: {
+        id: cita.paciente?.id,
+        nombres: cita.paciente?.nombres,
+        apellidos: cita.paciente?.apellidos
+      },
+      fecha_hora: cita.fecha_hora,
+      modalidad: cita.modalidad,
+      estado: cita.estado,
+      motivo_consulta: cita.motivo_consulta,
+      enlace_virtual: cita.enlace_virtual,
+      notas_consulta: cita.notas_consulta,
+      costo_pagado: cita.costo_pagado,
+      fecha_creacion: cita.fecha_creacion,
+      fecha_actualizacion: cita.fecha_actualizacion
+    }));
+  }
+
   /**
    * Cancela una cita (solo si está en estado AGENDADA o CONFIRMADA)
    */
@@ -640,6 +672,26 @@ class CitaService {
     const codigoReunion = Math.random().toString(36).substring(2, 15);
     return `https://meet.tuapp.com/${codigoReunion}`;
   }
+
+  async obtenerEstadisticasCitasMedico(medicoId) {
+    const resultado = await this.repository.obtenerEstadisticasCitasMedico(medicoId);
+
+    return {
+      medico_id: medicoId,
+      total_hoy: resultado.total_hoy,
+      total_mes_completadas: resultado.total_mes_completadas,
+      hoy: new Date().getDate(),
+      proximas_citas_hoy: resultado.proximas_citas_hoy?.map(cita => ({
+        id: cita.id,
+        hora: cita.fecha_hora.toISOString(),
+        estado: cita.estado,
+        modalidad: cita.modalidad,
+        paciente: cita.paciente ? `${cita.paciente.nombres} ${cita.paciente.apellidos}` : null
+      }))
+    };
+  }
+
+
 }
 
 export default CitaService;
