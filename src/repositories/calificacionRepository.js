@@ -10,8 +10,29 @@ import {
   sequelize 
 } from '../models/index.js';
 import { Op } from 'sequelize';
+import { CalculadoraReputacion } from '../infra/strategies/calificacionStrategy.js';
+import { EstrategiaFactory } from '../infra/strategies/calificacionStrategy.js';
 
 class CalificacionRepository {
+  constructor() {
+    // Por defecto usa estrategia simple
+    // Puedes cambiarla dinámicamente según necesites
+    this.calculadora = new CalculadoraReputacion(
+      EstrategiaFactory.crear('simple')
+    );
+  }
+
+  /**
+   * Cambiar la estrategia de cálculo en runtime
+   * @param {string} tipo - 'simple' | 'ponderado' | 'suavizado' | 'bayesian'
+   * @param {Object} opciones - Opciones específicas de la estrategia
+   */
+  configurarEstrategia(tipo, opciones = {}) {
+    const estrategia = EstrategiaFactory.crear(tipo, opciones);
+    this.calculadora.setStrategy(estrategia);
+    console.log(`Estrategia cambiada a: ${this.calculadora.obtenerNombreEstrategia()}`);
+  }
+
   // ==================== CALIFICACIONES DE MÉDICOS ====================
   
   async crearCalificacionMedico(data) {
@@ -116,18 +137,37 @@ class CalificacionRepository {
     return true;
   }
 
+  /**
+   * 🔥 MÉTODO REFACTORIZADO CON STRATEGY
+   * Calcula estadísticas usando la estrategia configurada
+   */
   async calcularEstadisticasMedico(medicoId) {
-    const [stats] = await CalificacionMedico.findAll({
+    // Obtener TODAS las calificaciones con sus fechas
+    const calificaciones = await CalificacionMedico.findAll({
       where: { medico_id: medicoId },
-      attributes: [
-        [sequelize.fn('AVG', sequelize.col('puntuacion')), 'promedio'],
-        [sequelize.fn('COUNT', sequelize.col('id')), 'total'],
-        [sequelize.fn('MIN', sequelize.col('puntuacion')), 'minimo'],
-        [sequelize.fn('MAX', sequelize.col('puntuacion')), 'maximo']
-      ],
+      attributes: ['id', 'puntuacion', 'fecha_creacion'],
       raw: true
     });
-    
+
+    if (calificaciones.length === 0) {
+      return {
+        promedio: 0,
+        total: 0,
+        minimo: 0,
+        maximo: 0,
+        distribucion: [],
+        estrategia: this.calculadora.obtenerNombreEstrategia()
+      };
+    }
+
+    // 🎯 USAR STRATEGY PATTERN AQUÍ
+    const promedio = this.calculadora.calcularPromedio(calificaciones);
+
+    // Estadísticas básicas (sin strategy, son fijas)
+    const puntuaciones = calificaciones.map(c => c.puntuacion);
+    const minimo = Math.min(...puntuaciones);
+    const maximo = Math.max(...puntuaciones);
+
     // Distribución por puntuación
     const distribucion = await CalificacionMedico.findAll({
       where: { medico_id: medicoId },
@@ -141,11 +181,12 @@ class CalificacionRepository {
     });
     
     return {
-      promedio: parseFloat(stats?.promedio || 0).toFixed(2),
-      total: parseInt(stats?.total || 0),
-      minimo: parseInt(stats?.minimo || 0),
-      maximo: parseInt(stats?.maximo || 0),
-      distribucion
+      promedio: parseFloat(promedio),
+      total: calificaciones.length,
+      minimo,
+      maximo,
+      distribucion,
+      estrategia: this.calculadora.obtenerNombreEstrategia()
     };
   }
 
@@ -191,7 +232,7 @@ class CalificacionRepository {
   }
 
   async obtenerCalificacionesPorProducto(productoId, filtros = {}) {
-    const where = { producto_id: productoId }; // ✅ CORREGIDO
+    const where = { producto_id: productoId };
     
     if (filtros.puntuacionMin) {
       where.puntuacion = { [Op.gte]: filtros.puntuacionMin };
@@ -235,8 +276,8 @@ class CalificacionRepository {
   async verificarCalificacionProductoPorCompra(compraId, productoId) {
     return await CalificacionProducto.findOne({ 
       where: { 
-        compra_id: compraId,      // ✅ CORREGIDO
-        producto_id: productoId   // ✅ CORREGIDO
+        compra_id: compraId,
+        producto_id: productoId
       } 
     });
   }
@@ -261,7 +302,7 @@ class CalificacionRepository {
     
     return {
       existe: true,
-      entregada: compra.estado === 'ENTREGADA',  // ✅ CORREGIDO
+      entregada: compra.estado === 'ENTREGADA',
       estado: compra.estado,
       fechaEntrega: compra.fecha_entrega
     };
@@ -280,21 +321,36 @@ class CalificacionRepository {
     return true;
   }
 
+  /**
+   * 🔥 MÉTODO REFACTORIZADO CON STRATEGY
+   */
   async calcularEstadisticasProducto(productoId) {
-    const [stats] = await CalificacionProducto.findAll({
-      where: { producto_id: productoId }, // ✅ CORREGIDO
-      attributes: [
-        [sequelize.fn('AVG', sequelize.col('puntuacion')), 'promedio'],
-        [sequelize.fn('COUNT', sequelize.col('id')), 'total'],
-        [sequelize.fn('MIN', sequelize.col('puntuacion')), 'minimo'],
-        [sequelize.fn('MAX', sequelize.col('puntuacion')), 'maximo']
-      ],
+    const calificaciones = await CalificacionProducto.findAll({
+      where: { producto_id: productoId },
+      attributes: ['id', 'puntuacion', 'fecha_creacion'],
       raw: true
     });
-    
-    // Distribución por puntuación
+
+    if (calificaciones.length === 0) {
+      return {
+        promedio: 0,
+        total: 0,
+        minimo: 0,
+        maximo: 0,
+        distribucion: [],
+        estrategia: this.calculadora.obtenerNombreEstrategia()
+      };
+    }
+
+    // 🎯 USAR STRATEGY PATTERN
+    const promedio = this.calculadora.calcularPromedio(calificaciones);
+
+    const puntuaciones = calificaciones.map(c => c.puntuacion);
+    const minimo = Math.min(...puntuaciones);
+    const maximo = Math.max(...puntuaciones);
+
     const distribucion = await CalificacionProducto.findAll({
-      where: { producto_id: productoId }, // ✅ CORREGIDO
+      where: { producto_id: productoId },
       attributes: [
         'puntuacion',
         [sequelize.fn('COUNT', sequelize.col('id')), 'cantidad']
@@ -305,11 +361,12 @@ class CalificacionRepository {
     });
     
     return {
-      promedio: parseFloat(stats?.promedio || 0).toFixed(2),
-      total: parseInt(stats?.total || 0),
-      minimo: parseInt(stats?.minimo || 0),
-      maximo: parseInt(stats?.maximo || 0),
-      distribucion
+      promedio: parseFloat(promedio),
+      total: calificaciones.length,
+      minimo,
+      maximo,
+      distribucion,
+      estrategia: this.calculadora.obtenerNombreEstrategia()
     };
   }
 
@@ -334,7 +391,7 @@ class CalificacionRepository {
     
     if (tipo === 'medicos' || tipo === 'ambos') {
       result.medicos = await CalificacionMedico.findAll({
-        where: { paciente_id: pacienteId }, 
+        where: { paciente_id: pacienteId },
         include: [
           { model: Medico, as: 'medico', attributes: ['id', 'nombres', 'apellidos'] },
           { model: Cita, as: 'cita', attributes: ['fecha_hora', 'modalidad'] }
@@ -345,7 +402,7 @@ class CalificacionRepository {
     
     if (tipo === 'productos' || tipo === 'ambos') {
       result.productos = await CalificacionProducto.findAll({
-        where: { paciente_id: pacienteId }, 
+        where: { paciente_id: pacienteId },
         include: [
           { model: ProductoFarmaceutico, as: 'producto', attributes: ['id', 'nombre', 'marca'] },
           { model: Compra, as: 'compra', attributes: ['numero_orden', 'fecha_entrega'] }
