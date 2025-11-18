@@ -95,8 +95,8 @@ export const setAuthCookies = (res, accessToken, refreshToken, rememberMe = fals
   const commonCookieOptions = {
     httpOnly: true,
     secure: isProduction, // true en producción (HTTPS)
-    sameSite: isProduction ? 'none' : 'lax', // IMPORTANTE: 'none' para cross-origin
-    domain: isProduction ? '.vercel.app' : undefined, // Dominio compartido en producción
+    sameSite: 'none', // IMPORTANTE: 'none' para cross-origin
+    domain: 'saludk-frontend.vercel.app', // Dominio compartido en producción
     path: '/',
   };
 
@@ -119,8 +119,8 @@ export const clearAuthCookies = (res) => {
   const commonClearOptions = {
     httpOnly: true,
     secure: isProduction,
-    sameSite: isProduction ? 'none' : 'lax',
-    domain: isProduction ? '.vercel.app' : undefined,
+    sameSite:'none',
+    domain: 'saludk-frontend.vercel.app',
     path: '/',
   };
 
