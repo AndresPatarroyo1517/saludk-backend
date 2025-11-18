@@ -689,7 +689,8 @@ class CitaService {
         fecha: cita.fecha_hora.toISOString(),
         estado: cita.estado,
         modalidad: cita.modalidad,
-        paciente: cita.paciente ? `${cita.paciente.nombres} ${cita.paciente.apellidos}` : null
+        paciente: cita.paciente ? `${cita.paciente.nombres} ${cita.paciente.apellidos}` : null,
+        id_paciente: cita.paciente.id
       })),
 
       citas_mes: resultado.citas_mes?.map(cita => ({
@@ -697,7 +698,8 @@ class CitaService {
         fecha: cita.fecha_hora.toISOString(),
         estado: cita.estado,
         modalidad: cita.modalidad,
-        paciente: cita.paciente ? `${cita.paciente.nombres} ${cita.paciente.apellidos}` : null
+        paciente: cita.paciente ? `${cita.paciente.nombres} ${cita.paciente.apellidos}` : null,
+        id_paciente: cita.paciente.id
       }))
     };
   }
