@@ -24,14 +24,14 @@ const router = express.Router();
  *             properties:
  *               email:
  *                 type: string
- *                 example: andresp@gmail.com
+ *                 example: example@example.com
  *               password:
  *                 type: string
- *                 example: "Andres1565?"
+ *                 example: "Example!"
  *               rememberMe:
  *                 type: boolean
  *                 example: true
- *                 description: Extiende sesión a 30 días
+ *                 description: Extiende sesión a 7 días
  *     responses:
  *       200:
  *         description: Login exitoso, tokens en cookies

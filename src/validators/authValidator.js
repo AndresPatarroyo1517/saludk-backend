@@ -30,11 +30,11 @@ export const registerSchema = Joi.object({
       'any.required': 'El email es obligatorio'
     }),
   password: Joi.string()
-    .min(8)
+    .min(6)
     .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])/)
     .required()
     .messages({
-      'string.min': 'La contraseña debe tener al menos 8 caracteres',
+      'string.min': 'La contraseña debe tener al menos 6 caracteres',
       'string.pattern.base': 'La contraseña debe contener mayúsculas, minúsculas, números y caracteres especiales',
       'any.required': 'La contraseña es obligatoria'
     }),
@@ -74,11 +74,11 @@ export const changePasswordSchema = Joi.object({
       'any.required': 'La contraseña actual es obligatoria'
     }),
   newPassword: Joi.string()
-    .min(8)
+    .min(6)
     .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])/)
     .required()
     .messages({
-      'string.min': 'La nueva contraseña debe tener al menos 8 caracteres',
+      'string.min': 'La nueva contraseña debe tener al menos 6 caracteres',
       'string.pattern.base': 'La nueva contraseña debe contener mayúsculas, minúsculas, números y caracteres especiales',
       'any.required': 'La nueva contraseña es obligatoria'
     }),
