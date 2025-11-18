@@ -7,8 +7,11 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Solo crear directorio y archivos si NO estamos en producción
+const isProduction = process.env.NODE_ENV === 'production';
 const logsDir = path.join(__dirname, '../../logs');
-if (!fs.existsSync(logsDir)) {
+
+if (!isProduction && !fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
@@ -35,11 +38,9 @@ const devFormat = winston.format.combine(
   winston.format.colorize({ all: true }),
   winston.format.printf(({ timestamp, level, message, ...metadata }) => {
     let msg = `[${timestamp}] ${level}: ${message}`;
-
     if (Object.keys(metadata).length > 0) {
       msg += ` ${JSON.stringify(metadata, null, 2)}`;
     }
-    
     return msg;
   })
 );
@@ -63,56 +64,58 @@ const fileFormat = winston.format.combine(
 
 const transports = [];
 
-if (process.env.NODE_ENV !== 'production') {
+// Console SIEMPRE (para que Vercel/producción capture stdout)
+transports.push(
+  new winston.transports.Console({
+    format: isProduction ? prodFormat : devFormat,
+    level: process.env.LOG_LEVEL || (isProduction ? 'info' : 'debug'),
+  })
+);
+
+// Archivos SOLO si NO estamos en producción
+if (!isProduction) {
   transports.push(
-    new winston.transports.Console({
-      format: devFormat,
-      level: 'debug',
+    new DailyRotateFile({
+      filename: path.join(logsDir, 'error-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      level: 'error',
+      format: fileFormat,
+      maxSize: '20m',
+      maxFiles: '30d',
+      zippedArchive: true,
+    })
+  );
+
+  transports.push(
+    new DailyRotateFile({
+      filename: path.join(logsDir, 'combined-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      format: fileFormat,
+      maxSize: '20m',
+      maxFiles: '14d',
+      zippedArchive: true,
+    })
+  );
+
+  transports.push(
+    new DailyRotateFile({
+      filename: path.join(logsDir, 'audit-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      format: prodFormat,
+      maxSize: '50m',
+      maxFiles: '90d',
+      zippedArchive: true,
+      level: 'info',
     })
   );
 }
 
-transports.push(
-  new DailyRotateFile({
-    filename: path.join(logsDir, 'error-%DATE%.log'),
-    datePattern: 'YYYY-MM-DD',
-    level: 'error',
-    format: fileFormat,
-    maxSize: '20m', 
-    maxFiles: '30d', 
-    zippedArchive: true, 
-  })
-);
-
-transports.push(
-  new DailyRotateFile({
-    filename: path.join(logsDir, 'combined-%DATE%.log'),
-    datePattern: 'YYYY-MM-DD',
-    format: fileFormat,
-    maxSize: '20m',
-    maxFiles: '14d', 
-    zippedArchive: true,
-  })
-);
-
-transports.push(
-  new DailyRotateFile({
-    filename: path.join(logsDir, 'audit-%DATE%.log'),
-    datePattern: 'YYYY-MM-DD',
-    format: prodFormat,
-    maxSize: '50m',
-    maxFiles: '90d', 
-    zippedArchive: true,
-    level: 'info',
-  })
-);
-
 const logger = winston.createLogger({
   levels,
-  level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
+  level: process.env.LOG_LEVEL || (isProduction ? 'info' : 'debug'),
   transports,
-  exitOnError: false, 
-  format: process.env.NODE_ENV === 'production' ? prodFormat : devFormat,
+  exitOnError: false,
+  format: isProduction ? prodFormat : devFormat,
 });
 
 logger.audit = (action, entity, metadata = {}) => {
@@ -160,32 +163,37 @@ logger.stream = {
   },
 };
 
-logger.exceptions.handle(
-  new DailyRotateFile({
-    filename: path.join(logsDir, 'exceptions-%DATE%.log'),
-    datePattern: 'YYYY-MM-DD',
-    maxSize: '20m',
-    maxFiles: '30d',
-    zippedArchive: true,
-  })
-);
+// Exception/rejection handlers SOLO si NO estamos en producción
+if (!isProduction) {
+  logger.exceptions.handle(
+    new DailyRotateFile({
+      filename: path.join(logsDir, 'exceptions-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      maxSize: '20m',
+      maxFiles: '30d',
+      zippedArchive: true,
+    })
+  );
 
-logger.rejections.handle(
-  new DailyRotateFile({
-    filename: path.join(logsDir, 'rejections-%DATE%.log'),
-    datePattern: 'YYYY-MM-DD',
-    maxSize: '20m',
-    maxFiles: '30d',
-    zippedArchive: true,
-  })
-);
+  logger.rejections.handle(
+    new DailyRotateFile({
+      filename: path.join(logsDir, 'rejections-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      maxSize: '20m',
+      maxFiles: '30d',
+      zippedArchive: true,
+    })
+  );
+}
 
 if (process.env.NODE_ENV !== 'test') {
   logger.info('='.repeat(50));
   logger.info('Logger initialized successfully');
   logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
   logger.info(`Log Level: ${logger.level}`);
-  logger.info(`Logs Directory: ${logsDir}`);
+  if (!isProduction) {
+    logger.info(`Logs Directory: ${logsDir}`);
+  }
   logger.info('='.repeat(50));
 }
 
