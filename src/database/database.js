@@ -22,6 +22,7 @@ const sequelize = new Sequelize(database, username, password, {
   host: host,
   port: port,
   dialect: 'postgres',
+  dialectModule: require('pg'),
   protocol: 'postgres',
   underscored: true,
   dialectOptions: {
@@ -34,11 +35,11 @@ const sequelize = new Sequelize(database, username, password, {
     idle_in_transaction_session_timeout: 30000,
   },
   pool: {
-    max: 20,              // Conexiones máximas
-    min: 5,               // Conexiones mínimas
+    max: 2,              // Conexiones máximas
+    min: 0,               // Conexiones mínimas
     acquire: 30000,       // Tiempo máximo para adquirir conexión (30s)
-    idle: 10000,          // Tiempo máximo de inactividad (10s)
-    evict: 1000,          // Tiempo de verificación de conexiones inactivas (1s)
+    idle: 0,          // Tiempo máximo de inactividad (10s)
+    evict: 5000,          // Tiempo de verificación de conexiones inactivas (1s)
   },
   logging: (msg) => {
     if (process.env.NODE_ENV !== 'production') {
