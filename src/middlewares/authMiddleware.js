@@ -96,7 +96,6 @@ export const setAuthCookies = (res, accessToken, refreshToken, rememberMe = fals
     httpOnly: true,
     secure: isProduction, // true en producción (HTTPS)
     sameSite: 'none', // IMPORTANTE: 'none' para cross-origin
-    domain: 'saludk-frontend.vercel.app', // Dominio compartido en producción
     path: '/',
   };
 
@@ -120,7 +119,6 @@ export const clearAuthCookies = (res) => {
     httpOnly: true,
     secure: isProduction,
     sameSite:'none',
-    domain: 'saludk-frontend.vercel.app',
     path: '/',
   };
 
