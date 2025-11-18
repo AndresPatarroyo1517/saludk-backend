@@ -1,5 +1,6 @@
 import express from 'express';
 import multer from 'multer';
+import { uploadSingle, uploadMultiple } from '../middlewares/fileUpload.js';
 import registroController from '../controllers/registroController.js';
 import { requireDirector } from '../middlewares/authMiddleware.js';
 import rateLimiter from '../middlewares/rateLimiter.js';
@@ -12,25 +13,7 @@ import {
 
 const router = express.Router();
 
-// Configurar multer para archivos temporales
-const upload = multer({ 
-  dest: 'uploads/temp/',
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
-  fileFilter: (req, file, cb) => {
-    const allowedMimes = [
-      'application/pdf',
-      'image/jpeg',
-      'image/jpg',
-      'image/png'
-    ];
-    
-    if (allowedMimes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Tipo de archivo no permitido. Solo PDF, JPG, PNG'));
-    }
-  }
-});
+
 
 /**
  * @swagger
@@ -451,7 +434,7 @@ router.post(
 router.post(
   '/solicitudes/:id/documentos',
   rateLimiter.rateLimit.upload || rateLimiter.rateLimit.global,
-  upload.single('documento'),
+  uploadSingle('documento'), // ⬅️ Usa tu helper
   registroController.subirDocumento
 );
 
