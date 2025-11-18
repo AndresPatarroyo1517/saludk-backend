@@ -1,4 +1,5 @@
 import { Sequelize } from 'sequelize';
+import pg from 'pg';
 import logger from '../utils/logger.js';
 import dotenv from 'dotenv';
 dotenv.config();
@@ -22,7 +23,7 @@ const sequelize = new Sequelize(database, username, password, {
   host: host,
   port: port,
   dialect: 'postgres',
-  dialectModule: require('pg'),
+  dialectModule: pg,
   protocol: 'postgres',
   underscored: true,
   dialectOptions: {
