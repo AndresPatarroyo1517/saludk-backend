@@ -1,6 +1,7 @@
 import express from 'express';
 import ProductosController from '../controllers/productosController.js';
 import { requirePaciente, authMiddleware, checkRole } from '../middlewares/authMiddleware.js';
+import { defaultCacheMiddleware } from '../middlewares/cacheMiddleware.js';
 
 const router = express.Router();
 
@@ -86,7 +87,7 @@ const router = express.Router();
  *                 error:
  *                   type: string
  */
-router.get('/', ProductosController.consultarCatalogo);
+router.get('/', defaultCacheMiddleware(600, 'productos'), ProductosController.consultarCatalogo);
 
 // ==================== RUTAS PROTEGIDAS (Pacientes) ====================
 

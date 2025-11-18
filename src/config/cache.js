@@ -88,11 +88,44 @@ async function getOrSet(key, loaderFn, ttl = DEFAULT_TTL, namespace = 'default')
   }
 }
 
+async function safeInvalidateNamespace(namespace) {
+  const setName = keysSetName(namespace);
+  let lock;
+  try {
+    // Usar lock para prevenir race conditions
+    const resource = `locks:invalidate:${namespace}`;
+    lock = await redlock.acquire([resource], 5000);
+    
+    const members = await redis.smembers(setName);
+    if (!members || members.length === 0) return 0;
+    
+    const pipeline = redis.pipeline();
+    members.forEach(k => pipeline.del(k));
+    pipeline.del(setName); // Limpiar el set también
+    
+    const res = await pipeline.exec();
+    return members.length;
+  } catch (err) {
+    console.error(`Error en safeInvalidateNamespace ${namespace}:`, err);
+    throw err;
+  } finally {
+    if (lock) {
+      try {
+        await lock.release();
+      } catch (e) {
+        // Log pero no fallar
+        console.warn('Error liberando lock en invalidate:', e.message);
+      }
+    }
+  }
+}
+
+
 export default {
   get,
   set,
   del,
   getOrSet,
-  invalidateNamespace,
+  invalidateNamespace: safeInvalidateNamespace,
   makeKey,
 };

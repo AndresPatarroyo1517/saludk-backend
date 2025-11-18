@@ -1,6 +1,7 @@
 import express from 'express';
 import { getKPIs } from '../controllers/kpiController.js';
 import { requireDirector } from '../middlewares/authMiddleware.js';
+import { defaultCacheMiddleware } from '../middlewares/cacheMiddleware.js';
 
 const router = express.Router();
 
@@ -101,6 +102,6 @@ const router = express.Router();
  *       '500':
  *         description: Error al obtener KPIs
  */
-router.get('/kpi', requireDirector, getKPIs);
+router.get('/kpi', requireDirector, defaultCacheMiddleware(300, 'kpis'), getKPIs);
 
 export default router;

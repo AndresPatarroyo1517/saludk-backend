@@ -1,6 +1,7 @@
 import express from 'express';
 import calificacionController from '../controllers/calificacionController.js';
 import { requirePaciente, authMiddleware} from '../middlewares/authMiddleware.js';
+import { defaultCacheMiddleware } from '../middlewares/cacheMiddleware.js';
 
 const router = express.Router();
 
@@ -81,7 +82,7 @@ router.post('/medicos', requirePaciente, (req, res) => {
  *       404:
  *         description: Calificación no encontrada
  */
-router.get('/medicos/:id', calificacionController.obtenerCalificacionMedicoPorId);
+router.get('/medicos/:id', defaultCacheMiddleware(600, 'calificaciones'), calificacionController.obtenerCalificacionMedicoPorId);
 
 /**
  * @swagger
@@ -184,7 +185,7 @@ router.delete('/medicos/:id', requirePaciente, (req, res) => {
  *       200:
  *         description: Lista de calificaciones
  */
-router.get('/medicos/medico/:medicoId', calificacionController.obtenerCalificacionesPorMedico);
+router.get('/medicos/medico/:medicoId', defaultCacheMiddleware(600, 'calificaciones'), calificacionController.obtenerCalificacionesPorMedico);
 
 /**
  * @swagger
@@ -203,7 +204,7 @@ router.get('/medicos/medico/:medicoId', calificacionController.obtenerCalificaci
  *       200:
  *         description: Estadísticas de calificaciones
  */
-router.get('/medicos/medico/:medicoId/estadisticas', calificacionController.obtenerEstadisticasMedico);
+router.get('/medicos/medico/:medicoId/estadisticas', defaultCacheMiddleware(600, 'calificaciones'), calificacionController.obtenerEstadisticasMedico);
 
 // ==================== RUTAS DE CALIFICACIONES DE PRODUCTOS ====================
 
@@ -270,7 +271,7 @@ router.post('/productos', requirePaciente, (req, res) => {
  *       404:
  *         description: Calificación no encontrada
  */
-router.get('/productos/:id', calificacionController.obtenerCalificacionProductoPorId);
+router.get('/productos/:id', defaultCacheMiddleware(600, 'calificaciones'), calificacionController.obtenerCalificacionProductoPorId);
 
 /**
  * @swagger
@@ -358,7 +359,7 @@ router.delete('/productos/:id', requirePaciente, (req, res) => {
  *       200:
  *         description: Lista de calificaciones
  */
-router.get('/productos/producto/:productoId', calificacionController.obtenerCalificacionesPorProducto);
+router.get('/productos/producto/:productoId', defaultCacheMiddleware(600, 'calificaciones'), calificacionController.obtenerCalificacionesPorProducto);
 
 /**
  * @swagger
@@ -377,7 +378,7 @@ router.get('/productos/producto/:productoId', calificacionController.obtenerCali
  *       200:
  *         description: Estadísticas de calificaciones
  */
-router.get('/productos/producto/:productoId/estadisticas', calificacionController.obtenerEstadisticasProducto);
+router.get('/productos/producto/:productoId/estadisticas', defaultCacheMiddleware(600, 'calificaciones'), calificacionController.obtenerEstadisticasProducto);
 
 // ==================== RUTAS GENERALES ====================
 

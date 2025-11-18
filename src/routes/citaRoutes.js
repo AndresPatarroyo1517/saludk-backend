@@ -1,6 +1,7 @@
 import express from 'express';
 import CitaController from '../controllers/citasController.js';
 import { authMiddleware } from "../middlewares/authMiddleware.js";
+import { defaultCacheMiddleware } from '../middlewares/cacheMiddleware.js';
 
 const router = express.Router();
 const controller = new CitaController();
@@ -177,7 +178,7 @@ const controller = new CitaController();
  *                 mensaje:
  *                   type: string
  */
-router.get('/disponibilidad/:medicoId', controller.obtenerDisponibilidad);
+router.get('/disponibilidad/:medicoId', defaultCacheMiddleware(120, 'disponibilidad'), controller.obtenerDisponibilidad);
 
 /**
  * @swagger
@@ -450,7 +451,7 @@ router.post('/disponibilidad/:medicoId/validar', controller.validarSlot);
  *                   type: string
  *                   example: Error al obtener próximos slots
  */
-router.get('/disponibilidad/:medicoId/proximos-slots', controller.obtenerProximosSlots);
+router.get('/disponibilidad/:medicoId/proximos-slots', defaultCacheMiddleware(60, 'disponibilidad'), controller.obtenerProximosSlots);
 /**
  * @swagger
  * /citas:

@@ -1,6 +1,7 @@
 import express from 'express';
 import db from '../models/index.js';
 import logger from '../utils/logger.js';
+import { defaultCacheMiddleware } from '../middlewares/cacheMiddleware.js';
 
 const router = express.Router();
 
@@ -34,7 +35,7 @@ const router = express.Router();
  *                   items:
  *                     type: object
  */
-router.get('/', async (req, res) => {
+router.get('/', defaultCacheMiddleware(3600, 'planes'), async (req, res) => {
   try {
     const planes = await db.Plan.findAll({
       where: { activo: true },
@@ -47,6 +48,7 @@ router.get('/', async (req, res) => {
     return res.status(500).json({ success: false, error: 'Error al listar planes.' });
   }
 });
+
 
 /**
  * @swagger
@@ -66,7 +68,7 @@ router.get('/', async (req, res) => {
  *       404:
  *         description: Plan no encontrado
  */
-router.get('/:id', async (req, res) => {
+router.get('/:id', defaultCacheMiddleware(3600, 'planes'), async (req, res) => {
   try {
     const plan = await db.Plan.findByPk(req.params.id);
     if (!plan || !plan.activo) {

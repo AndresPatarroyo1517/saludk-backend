@@ -1,6 +1,7 @@
 import express from 'express';
 import MedicoController from '../controllers/medicoController.js';
 import { requireMedico } from '../middlewares/authMiddleware.js';
+import { defaultCacheMiddleware } from '../middlewares/cacheMiddleware.js';
 
 const router = express.Router();
 const controller = new MedicoController();
@@ -48,7 +49,7 @@ const controller = new MedicoController();
  *       200:
  *         description: Lista de médicos obtenida exitosamente
  */
-router.get('/', controller.listarMedicos);
+router.get('/', defaultCacheMiddleware(600, 'medicos'), controller.listarMedicos);
 
 /**
  * @swagger
@@ -70,7 +71,7 @@ router.get('/', controller.listarMedicos);
  *       404:
  *         description: Médico no encontrado
  */
-router.get('/:medicoId', controller.obtenerDetalle);
+router.get('/:medicoId', defaultCacheMiddleware(900, 'medicos'), controller.obtenerDetalle);
 
 /**
  * @swagger
@@ -89,7 +90,7 @@ router.get('/:medicoId', controller.obtenerDetalle);
  *       200:
  *         description: Disponibilidad obtenida
  */
-router.get('/:medicoId/disponibilidad-consulta', controller.obtenerDisponibilidad);
+router.get('/:medicoId/disponibilidad-consulta', defaultCacheMiddleware(120, 'disponibilidad'), controller.obtenerDisponibilidad);
 
 // ==================== RUTAS PROTEGIDAS (Solo Médicos) ====================
 
