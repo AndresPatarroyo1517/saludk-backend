@@ -434,7 +434,7 @@ router.post(
 router.post(
   '/solicitudes/:id/documentos',
   rateLimiter.rateLimit.upload || rateLimiter.rateLimit.global,
-  uploadSingle('documento'), // ⬅️ Usa tu helper
+  uploadMultiple('documento'), // ⬅️ Usa tu helper
   registroController.subirDocumento
 );
 
