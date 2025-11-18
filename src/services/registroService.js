@@ -1,7 +1,7 @@
 import SolicitudBuilder from "../jobs/solicitudBuilder.js";
 import SolicitudRepository from "../repositories/solicitudRepository.js";
 import { validatePasswordStrength } from "../utils/passwordUtils.js";
-import { subirArchivo, generarUrlFirmada } from "./storjService.js";
+import { subirArchivo, generarUrlFirmada } from "./storjservice.js";
 import logger from "../utils/logger.js";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
