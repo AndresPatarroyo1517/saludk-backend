@@ -85,22 +85,28 @@ export const verifyRefreshToken = (token) => {
  * Configura cookies de autenticación
  */
 export const setAuthCookies = (res, accessToken, refreshToken, rememberMe = false) => {
+  const isProduction = process.env.NODE_ENV === 'production';
   const accessTokenMaxAge = 15 * 60 * 1000; // 15 minutos
   const refreshTokenMaxAge = rememberMe 
     ? 30 * 24 * 60 * 60 * 1000  // 30 días
     : 7 * 24 * 60 * 60 * 1000;   // 7 días
 
-  res.cookie('accessToken', accessToken, {
+  // Configuración común para ambas cookies
+  const commonCookieOptions = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    secure: isProduction, // true en producción (HTTPS)
+    sameSite: isProduction ? 'none' : 'lax', // IMPORTANTE: 'none' para cross-origin
+    domain: isProduction ? '.vercel.app' : undefined, // Dominio compartido en producción
+    path: '/',
+  };
+
+  res.cookie('accessToken', accessToken, {
+    ...commonCookieOptions,
     maxAge: accessTokenMaxAge
   });
 
   res.cookie('refreshToken', refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    ...commonCookieOptions,
     maxAge: refreshTokenMaxAge
   });
 };
@@ -109,18 +115,18 @@ export const setAuthCookies = (res, accessToken, refreshToken, rememberMe = fals
  * Limpia cookies de autenticación
  */
 export const clearAuthCookies = (res) => {
-  res.clearCookie('accessToken', {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const commonClearOptions = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict'
-  });
-  res.clearCookie('refreshToken', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict'
-  });
-};
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    domain: isProduction ? '.vercel.app' : undefined,
+    path: '/',
+  };
 
+  res.clearCookie('accessToken', commonClearOptions);
+  res.clearCookie('refreshToken', commonClearOptions);
+};
 /**
  * Middleware de autenticación - MEJORADO CON CARGA DE ENTIDADES
  * 
