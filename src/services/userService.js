@@ -340,12 +340,13 @@ class UserService {
             'nombres',
             'apellidos',
             'especialidad',
-            'numero_licencia',
+            'numero_identificacion',
+            'registro_medico',
             'telefono',
-            'biografia',
-            'tarifa_consulta',
-            'calificacion_promedio',
-            'total_consultas'
+            'localidad',
+            'costo_consulta_presencial',
+            'costo_consulta_virtual',
+            'calificacion_promedio'
           ],
           required: true,
           include: [
@@ -358,10 +359,10 @@ class UserService {
                 'dia_semana',
                 'hora_inicio',
                 'hora_fin',
-                'activo'
+                'disponible'
               ],
               where: {
-                activo: true
+                disponible: true
               },
               required: false
             },
@@ -402,7 +403,7 @@ class UserService {
               as: 'calificaciones',
               attributes: [
                 'id',
-                'calificacion',
+                'puntuacion',
                 'comentario',
                 'fecha_creacion'
               ],
