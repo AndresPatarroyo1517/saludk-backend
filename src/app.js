@@ -57,7 +57,7 @@ const corsOptions = {
 
     const allowedOrigins = process.env.FRONTEND_URL
       ? process.env.FRONTEND_URL.split(',')
-      : ['https://saludk-frontend.vercel.app/'];
+      : ['https://saludk-frontend.vercel.app/', 'https://saludk-frontend.vercel.app'];
 
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
