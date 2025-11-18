@@ -26,11 +26,11 @@ SaludK Backend is a RESTful API service that provides the backend infrastructure
 
 - **Runtime Environment**: Node.js
 - **Framework**: Express.js
-- **Database**: [To be configured - MongoDB/PostgreSQL/MySQL]
-- **Authentication**: [To be configured - JWT/Passport]
-- **Validation**: [To be configured - Joi/Express-validator]
+- **Database**: Using Cockroach DB
+- **Authentication**: Cookies + JWT 
+- **Validation**: Joi Validation
 - **Environment Variables**: dotenv
-- **Logging**: [To be configured - Winston/Morgan]
+- **Logging**: Morgan and Wiston
 
 ## 📦 Prerequisites
 
@@ -80,23 +80,85 @@ cp .env.example .env
 Edit the `.env` file with your configuration:
 
 ```env
-# Server Configuration
+NODE_ENV=production
 PORT=3000
-NODE_ENV=development
+API_VERSION=v1
 
-# Database Configuration
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=saludk_db
-DB_USER=your_username
-DB_PASSWORD=your_password
+# ==========================================
+# CockroachDB
+# ==========================================
 
-# JWT Configuration
-JWT_SECRET=your_jwt_secret_key
-JWT_EXPIRES_IN=1d
+DB_USERNAME=...
+DB_PASSWORD=...
+DB_HOST=...
+DB_PORT=...
+DB_NAME=...
 
-# Other configurations
-CORS_ORIGIN=http://localhost:3001
+REDIS_HOST=...
+REDIS_PORT=...
+REDIS_PASSWORD=...
+REDIS_NODE=..
+
+JWT_ACCESS_SECRET=....
+JWT_REFRESH_SECRET=...
+
+# ==========================================
+# STORJ (Files storage)
+# ==========================================
+STORJ_ENDPOINT=...
+STORJ_ACCESS_KEY_ID=...
+STORJ_SECRET_ACCESS_KEY=...
+STORJ_BUCKET_NAME=...
+
+# ==========================================
+# STRIPE (Pagos)
+# ==========================================
+STRIPE_SECRET_KEY=...
+STRIPE_WEBHOOK_SECRET=...
+STRIPE_PUBLIC_KEY=...
+
+BANCO_CONSIGNACION=Bancolombia
+CUENTA_BANCARIA=1234567890
+TIPO_CUENTA=AHORROS
+
+# ==========================================
+# NODEMAILER (Emails)
+# ==========================================
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=tu_email@gmail.com
+SMTP_PASSWORD=tu_app_password
+EMAIL_FROM=noreply@saludk.com
+
+# ==========================================
+# TWILIO (SMS - Opcional)
+# ==========================================
+TWILIO_ACCOUNT_SID=...
+TWILIO_AUTH_TOKEN=..
+TWILIO_PHONE_NUMBER=...
+
+# ==========================================
+# RATE LIMITING (RNF002)
+# ==========================================
+RATE_LIMIT_WINDOW_MS=60000
+RATE_LIMIT_MAX_REQUESTS=100
+
+# ==========================================
+# CIFRADO (RNF001)
+# ==========================================
+ENCRYPTION_KEY=.....
+ENCRYPTION_ALGORITHM=aes-256-gcm
+
+# ==========================================
+# FRONTEND URL (CORS)
+# ==========================================
+FRONTEND_URL=http://localhost:4000
+
+# ==========================================
+# APIS EXTERNAS (HU-04 - MOCKS)
+# =========================================
+EXTERNAL_API_BD_NACIONAL=https://api-mock.saludk.com/bd-nacional
+EXTERNAL_API_ANTECEDENTES=https://api-mock.saludk.com/policia
 ```
 
 ## 🏃 Running the Application
@@ -277,7 +339,7 @@ This application can be deployed to:
 - **AWS** (EC2, ECS, Elastic Beanstalk)
 - **Google Cloud Platform**
 - **Azure**
-- **DigitalOcean**
+- **Vercel**
 
 Refer to the respective platform documentation for deployment instructions.
 
