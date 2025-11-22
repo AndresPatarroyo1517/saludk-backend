@@ -50,16 +50,19 @@ app.use(helmet({
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // En desarrollo permitimos cualquier origen para facilitar pruebas desde Swagger UI
-    if (process.env.NODE_ENV === 'development') {
+    // En desarrollo permitir cualquier origen
+    if (process.env.NODE_ENV !== 'production') {
       return callback(null, true);
     }
 
     const allowedOrigins = process.env.FRONTEND_URL
-      ? process.env.FRONTEND_URL.split(',')
-      : ['https://saludk-frontend.vercel.app/', 'https://saludk-frontend.vercel.app', 'http://localhost:4000'];
+      ? process.env.FRONTEND_URL.split(',').map(o => o.trim())
+      : [
+          'https://saludk-frontend.vercel.app',
+          'http://localhost:4000'
+        ];
 
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (origin && allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -70,6 +73,7 @@ const corsOptions = {
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
 };
+
 
 app.use(cors(corsOptions));
 app.use(hpp()); 
