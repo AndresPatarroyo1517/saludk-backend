@@ -58,7 +58,6 @@ const corsOptions = {
     const allowedOrigins = process.env.FRONTEND_URL
       ? process.env.FRONTEND_URL.split(',').map(o => o.trim())
       : [
-          'https://saludk-frontend.vercel.app',
           'http://localhost:4000'
         ];
 
