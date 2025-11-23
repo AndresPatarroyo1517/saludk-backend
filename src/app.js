@@ -50,26 +50,30 @@ app.use(helmet({
 
 const corsOptions = {
   origin: (origin, callback) => {
-    const allowedOrigins = process.env.FRONTEND_URL
-      ? process.env.FRONTEND_URL.split(',').map(o => o.trim())
-      : ['http://localhost:4000'];
 
-    if (!origin) {
-      // permitir peticiones sin origin (Postman, backend a backend)
+    // Si estamos en desarrollo → permitir localhost
+    const isDev = process.env.NODE_ENV !== 'production';
+
+    const allowedOrigins = isDev
+      ? ['http://localhost:4000', 'http://127.0.0.1:4000']
+      : (process.env.FRONTEND_URL
+          ? process.env.FRONTEND_URL.split(',').map(o => o.trim())
+          : []
+        );
+
+    if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
 
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error(`CORS blocked: ${origin}`));
-    }
+    return callback(new Error(`CORS blocked: ${origin}`));
   },
+
   credentials: true,
   optionsSuccessStatus: 200,
   methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
   allowedHeaders: ['Content-Type','Authorization','X-Request-ID'],
 };
+
 
 
 app.use(cors(corsOptions));
