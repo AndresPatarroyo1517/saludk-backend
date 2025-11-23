@@ -1,4 +1,3 @@
-// services/medicoService.js
 import MedicoRepository from '../repositories/medicoRepository.js';
 
 class MedicoService {
@@ -287,6 +286,10 @@ class MedicoService {
 
     return detalle;
   }
+
+    async eliminarDisponibilidad(disponibilidadId) {
+      return await this.repository.eliminarDisponibilidad(disponibilidadId);
+    }
 }
 
 export default MedicoService;

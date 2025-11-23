@@ -228,6 +228,32 @@ router.put('/mi-perfil/actualizar', requireMedico, (req, res) => {
   return controller.actualizarPerfil(req, res);
 });
 
-// (Endpoint de cambio de estado por médico revertido)
+/**
+ * @swagger
+ * /medicos/mi-disponibilidad/{disponibilidadId}:
+ *   delete:
+ *     summary: Eliminar disponibilidad (SOLO MÉDICO AUTENTICADO)
+ *     tags: [Médicos]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: disponibilidadId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Disponibilidad eliminada
+ *       401:
+ *         description: No autenticado
+ *       403:
+ *         description: No es médico
+ */
+router.delete('/mi-disponibilidad/:disponibilidadId', requireMedico, (req, res) => {
+  req.params.medicoId = req.user.medico.id;
+  return controller.eliminarDisponibilidad(req, res);
+});
 
 export default router;

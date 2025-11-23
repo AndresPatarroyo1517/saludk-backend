@@ -16,11 +16,6 @@ class MedicoRepository {
    * @returns {Promise<Array>} Disponibilidades creadas/actualizadas
    */
   async configurarDisponibilidad(medicoId, disponibilidades) {
-    // Eliminar disponibilidades anteriores
-    await this.DisponibilidadMedico.destroy({
-      where: { medico_id: medicoId }
-    });
-
     // Crear nuevas disponibilidades
     const disponibilidadesConMedico = disponibilidades.map(disp => ({
       ...disp,
