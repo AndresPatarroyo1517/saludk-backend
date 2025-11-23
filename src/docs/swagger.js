@@ -6,8 +6,11 @@ import swaggerJsdoc from 'swagger-jsdoc';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Construimos rutas para los archivos de rutas (usar notación POSIX para compatibilidad)
-const routesGlob = `${__dirname}/../routes/*.js`;
+// Construimos rutas para los archivos de rutas (forzar notación POSIX para compatibilidad en Windows)
+const basePathPosix = __dirname.replace(/\\/g, '/');
+const routesGlob = `${basePathPosix}/../routes/*.js`;
+// Añadimos un glob más amplio para cubrir todos los archivos JS en `src` (ayuda cuando los archivos están en subcarpetas)
+const allSrcGlob = `${basePathPosix}/../**/*.js`;
 
 const options = {
   definition: {
@@ -25,7 +28,7 @@ const options = {
       },
     ],
   },
-  apis: [routesGlob], // rutas donde están tus endpoints documentados
+  apis: [routesGlob, allSrcGlob], // rutas donde están tus endpoints documentados
 };
 
 const swaggerSpec = swaggerJsdoc(options);
