@@ -57,7 +57,7 @@ const corsOptions = {
 
     const allowedOrigins = process.env.FRONTEND_URL
       ? process.env.FRONTEND_URL.split(',').map(o => o.trim())
-      : [
+      : [//Dejar asi
           'http://localhost:4000'
         ];
 
