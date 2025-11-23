@@ -6,8 +6,8 @@ import swaggerJsdoc from 'swagger-jsdoc';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Construimos rutas absolutas para evitar problemas de paths relativos
-const routesGlob = path.join(__dirname, '..', 'routes', '*.js');
+// Construimos rutas para los archivos de rutas (usar notación POSIX para compatibilidad)
+const routesGlob = `${__dirname}/../routes/*.js`;
 
 const options = {
   definition: {
