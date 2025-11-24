@@ -231,6 +231,58 @@ class MedicoRepository {
       attributes: ['id', 'puntuacion', 'comentario', 'fecha_creacion']
     });
   }
+
+  async actualizarMedico(medicoId, datos) {
+    const medico = await this.Medico.findByPk(medicoId, { include: [{ model: this.Usuario, as: 'usuario' }] });
+    if (!medico) throw new Error('Médico no encontrado');
+
+    // Campos de médico permitidos
+    const camposMedico = {
+      nombres: datos.medico?.nombres,
+      apellidos: datos.medico?.apellidos,
+      numero_identificacion: datos.medico?.numero_identificacion,
+      especialidad: datos.medico?.especialidad,
+      registro_medico: datos.medico?.registro_medico,
+      telefono: datos.medico?.telefono,
+      localidad: datos.medico?.localidad,
+      disponible: datos.medico?.disponible,
+      costo_consulta_presencial: datos.medico?.costo_consulta_presencial,
+      costo_consulta_virtual: datos.medico?.costo_consulta_virtual,
+    };
+    await medico.update(camposMedico);
+
+    // Actualizar usuario si existe
+    if (datos.usuario && medico.usuario) {
+      const camposUsuario = {};
+      if (datos.usuario.email) camposUsuario.email = datos.usuario.email;
+      if (datos.usuario.password_hash) camposUsuario.password_hash = datos.usuario.password_hash;
+      if (datos.usuario.salt) camposUsuario.salt = datos.usuario.salt;
+
+      if (Object.keys(camposUsuario).length > 0) {
+        await medico.usuario.update(camposUsuario);
+      }
+    }
+
+    return medico;
+  }
+
+  async desactivarMedico(medicoId) {
+    const medico = await this.Medico.findByPk(medicoId, { include: [{ model: this.Usuario, as: 'usuario' }] });
+    if (!medico) throw new Error('Médico no encontrado');
+
+    await medico.update({ disponible: false });
+
+    if (medico.usuario) {
+      await medico.usuario.update({
+        activo: false,
+        fecha_actualizacion: new Date()
+      });
+    }
+
+    return medico;
+  }
+
+
 }
 
 export default MedicoRepository;

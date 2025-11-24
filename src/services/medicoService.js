@@ -1,4 +1,5 @@
 import MedicoRepository from '../repositories/medicoRepository.js';
+import registroService from './registroService.js';
 
 class MedicoService {
   constructor() {
@@ -290,6 +291,61 @@ class MedicoService {
     async eliminarDisponibilidad(disponibilidadId) {
       return await this.repository.eliminarDisponibilidad(disponibilidadId);
     }
+
+  async actualizarMedico(medicoId, datos) {
+    // Validar duplicados si vienen email, numero_identificacion o registro_medico
+    if (datos.usuario?.email || datos.medico?.numero_identificacion || datos.medico?.registro_medico) {
+      await registroService.verificarDuplicadosMedico(
+        datos.usuario?.email,
+        datos.medico?.numero_identificacion,
+        datos.medico?.registro_medico
+      );
+    }
+
+    // Hashear password si viene
+    if (datos.usuario?.password) {
+      const { password_hash, salt } = await registroService.hashPassword(datos.usuario.password);
+      datos.usuario.password_hash = password_hash;
+      datos.usuario.salt = salt;
+    }
+
+    // Normalizar email antes de guardar
+    if (datos.usuario?.email) {
+      datos.usuario.email = datos.usuario.email.toLowerCase();
+    }
+
+    const medicoActualizado = await this.repository.actualizarMedico(medicoId, datos);
+    return this._formatearMedicoPublico(medicoActualizado);
+  }
+
+  async desactivarMedico(medicoId) {
+    const medicoDesactivado = await this.repository.desactivarMedico(medicoId);
+    return this._formatearMedicoPublico(medicoDesactivado);
+  }
+
+  // Formateo para front
+  _formatearMedicoPublico(medico) {
+    const medicoJson = medico.toJSON ? medico.toJSON() : medico;
+    return {
+      id: medicoJson.id,
+      numero_identificacion: medicoJson.numero_identificacion,
+      nombres: medicoJson.nombres,
+      apellidos: medicoJson.apellidos,
+      nombre_completo: `${medicoJson.nombres} ${medicoJson.apellidos}`,
+      especialidad: medicoJson.especialidad,
+      registro_medico: medicoJson.registro_medico,
+      calificacion_promedio: parseFloat(medicoJson.calificacion_promedio) || 0,
+      costo_consulta_presencial: parseFloat(medicoJson.costo_consulta_presencial),
+      costo_consulta_virtual: parseFloat(medicoJson.costo_consulta_virtual),
+      localidad: medicoJson.localidad,
+      telefono: medicoJson.telefono,
+      disponible: medicoJson.disponible,
+      email: medicoJson.usuario?.email || null,
+      fecha_registro: medicoJson.fecha_registro,
+      fecha_actualizacion: medicoJson.fecha_actualizacion
+    };
+  }
+
 }
 
 export default MedicoService;

@@ -179,6 +179,49 @@ console.log("disponibilidadId =", req.params.disponibilidadId);
       });
     }
   };
+  // Actualizar médico
+  actualizarMedico = async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const datos = req.body; // Espera { usuario: { email, password? }, medico: { ... } }
+
+      const medicoActualizado = await this.service.actualizarMedico(userId, datos);
+
+      res.status(200).json({
+        success: true,
+        mensaje: 'Médico actualizado exitosamente',
+        data: medicoActualizado
+      });
+
+    } catch (error) {
+      console.error('Error al actualizar médico:', error);
+      res.status(error.status || 500).json({
+        error: error.message || 'Error al actualizar médico'
+      });
+    }
+  };
+
+  // Desactivar médico
+  desactivarMedico = async (req, res) => {
+    try {
+      const { userId } = req.params;
+
+      const resultado = await this.service.desactivarMedico(userId);
+
+      res.status(200).json({
+        success: true,
+        mensaje: 'Médico desactivado exitosamente',
+        data: resultado
+      });
+    } catch (error) {
+      console.error('Error al desactivar médico:', error);
+      res.status(500).json({
+        error: 'Error al desactivar médico',
+        mensaje: error.message
+      });
+    }
+  };
+
   
 }
 
