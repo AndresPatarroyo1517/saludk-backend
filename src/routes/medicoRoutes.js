@@ -1,6 +1,6 @@
 import express from 'express';
 import MedicoController from '../controllers/medicoController.js';
-import { requireMedico } from '../middlewares/authMiddleware.js';
+import { requireMedico, requireDirector} from '../middlewares/authMiddleware.js';
 import { defaultCacheMiddleware } from '../middlewares/cacheMiddleware.js';
 
 const router = express.Router();
@@ -226,6 +226,89 @@ router.get('/mi-disponibilidad', requireMedico, (req, res) => {
 router.put('/mi-perfil/actualizar', requireMedico, (req, res) => {
   req.params.medicoId = req.user.medico.id;
   return controller.actualizarPerfil(req, res);
+});
+
+/**
+ * @swagger
+ * /medicos/modificar/{userId}:
+ *   put:
+ *     summary: Actualizar los datos de un médico
+ *     tags: [Médicos]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID del médico a actualizar
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               usuario:
+ *                 type: object
+ *                 properties:
+ *                   email:
+ *                     type: string
+ *                   password:
+ *                     type: string
+ *               medico:
+ *                 type: object
+ *                 properties:
+ *                   nombres:
+ *                     type: string
+ *                   apellidos:
+ *                     type: string
+ *                   numero_identificacion:
+ *                     type: string
+ *                   especialidad:
+ *                     type: string
+ *                   registro_medico:
+ *                     type: string
+ *                   telefono:
+ *                     type: string
+ *                   localidad:
+ *                     type: string
+ *                   disponible:
+ *                     type: boolean
+ *                   costo_consulta_presencial:
+ *                     type: number
+ *                   costo_consulta_virtual:
+ *                     type: number
+ *     responses:
+ *       200:
+ *         description: Médico actualizado exitosamente
+ */
+router.put('/modificar/:userId', requireDirector, (req, res) => {
+  return controller.actualizarMedico(req, res);
+});
+
+/**
+ * @swagger
+ * /medicos/desactivar/{userId}:
+ *   put:
+ *     summary: Desactivar (eliminar) un médico
+ *     tags: [Médicos]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID del médico a desactivar
+ *     responses:
+ *       200:
+ *         description: Médico desactivado exitosamente
+ */
+router.put('/desactivar/:userId', requireDirector, (req, res) => {
+  return controller.desactivarMedico(req, res);
 });
 
 // (Endpoint de cambio de estado por médico revertido)
