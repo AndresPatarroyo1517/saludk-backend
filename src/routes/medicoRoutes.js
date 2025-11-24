@@ -6,91 +6,6 @@ import { defaultCacheMiddleware } from '../middlewares/cacheMiddleware.js';
 const router = express.Router();
 const controller = new MedicoController();
 
-/**
- * @swagger
- * tags:
- *   name: Médicos
- *   description: Gestión de médicos y disponibilidad
- */
-
-// ==================== RUTAS PÚBLICAS ====================
-
-/**
- * @swagger
- * /medicos:
- *   get:
- *     summary: Listar médicos disponibles (PÚBLICO)
- *     description: Obtiene lista de médicos con filtros. No requiere autenticación.
- *     tags: [Médicos]
- *     parameters:
- *       - in: query
- *         name: especialidad
- *         schema:
- *           type: string
- *       - in: query
- *         name: localidad
- *         schema:
- *           type: string
- *       - in: query
- *         name: modalidad
- *         schema:
- *           type: string
- *           enum: [PRESENCIAL, VIRTUAL]
- *       - in: query
- *         name: calificacion_minima
- *         schema:
- *           type: number
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 50
- *     responses:
- *       200:
- *         description: Lista de médicos obtenida exitosamente
- */
-router.get('/', defaultCacheMiddleware(60, 'medicos'), controller.listarMedicos);
-
-/**
- * @swagger
- * /medicos/{medicoId}:
- *   get:
- *     summary: Obtener detalle de un médico (PÚBLICO)
- *     description: Información detallada del médico. No requiere autenticación.
- *     tags: [Médicos]
- *     parameters:
- *       - in: path
- *         name: medicoId
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     responses:
- *       200:
- *         description: Detalle del médico obtenido
- *       404:
- *         description: Médico no encontrado
- */
-router.get('/:medicoId', defaultCacheMiddleware(900, 'medicos'), controller.obtenerDetalle);
-
-/**
- * @swagger
- * /medicos/{medicoId}/disponibilidad-consulta:
- *   get:
- *     summary: Consultar disponibilidad configurada del médico (PÚBLICO)
- *     tags: [Médicos]
- *     parameters:
- *       - in: path
- *         name: medicoId
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *     responses:
- *       200:
- *         description: Disponibilidad obtenida
- */
-router.get('/:medicoId/disponibilidad-consulta', defaultCacheMiddleware(120, 'disponibilidad'), controller.obtenerDisponibilidad);
 
 // ==================== RUTAS PROTEGIDAS (Solo Médicos) ====================
 
@@ -117,7 +32,7 @@ router.get('/mi-perfil', requireMedico, (req, res) => {
 
 /**
  * @swagger
- * /medicos/mi-disponibilidad:
+ * /medicos/mi-disponibilidad
  *   post:
  *     summary: Configurar disponibilidad horaria (SOLO MÉDICO AUTENTICADO)
  *     description: Permite al médico autenticado configurar sus horarios de disponibilidad
@@ -171,7 +86,7 @@ router.post('/mi-disponibilidad', requireMedico, (req, res) => {
 
 /**
  * @swagger
- * /medicos/mi-disponibilidad:
+ * /medicos/mi-disponibilidad
  *   get:
  *     summary: Obtener mi disponibilidad configurada (SOLO MÉDICO AUTENTICADO)
  *     tags: [Médicos]
@@ -338,6 +253,92 @@ router.put('/desactivar/:userId', requireDirector, (req, res) => {
   return controller.desactivarMedico(req, res);
 });
 
-// (Endpoint de cambio de estado por médico revertido)
+/**
+ * @swagger
+ * tags:
+ *   name: Médicos
+ *   description: Gestión de médicos y disponibilidad
+ */
+
+// ==================== RUTAS PÚBLICAS ====================
+
+/**
+ * @swagger
+ * /medicos:
+ *   get:
+ *     summary: Listar médicos disponibles (PÚBLICO)
+ *     description: Obtiene lista de médicos con filtros. No requiere autenticación.
+ *     tags: [Médicos]
+ *     parameters:
+ *       - in: query
+ *         name: especialidad
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: localidad
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: modalidad
+ *         schema:
+ *           type: string
+ *           enum: [PRESENCIAL, VIRTUAL]
+ *       - in: query
+ *         name: calificacion_minima
+ *         schema:
+ *           type: number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *     responses:
+ *       200:
+ *         description: Lista de médicos obtenida exitosamente
+ */
+router.get('/', defaultCacheMiddleware(60, 'medicos'), controller.listarMedicos);
+
+/**
+ * @swagger
+ * /medicos/{medicoId}/disponibilidad-consulta:
+ *   get:
+ *     summary: Consultar disponibilidad configurada del médico (PÚBLICO)
+ *     tags: [Médicos]
+ *     parameters:
+ *       - in: path
+ *         name: medicoId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Disponibilidad obtenida
+ */
+router.get('/:medicoId/disponibilidad-consulta', defaultCacheMiddleware(120, 'disponibilidad'), controller.obtenerDisponibilidad);
+
+
+/**
+ * @swagger
+ * /medicos/{medicoId}:
+ *   get:
+ *     summary: Obtener detalle de un médico (PÚBLICO)
+ *     description: Información detallada del médico. No requiere autenticación.
+ *     tags: [Médicos]
+ *     parameters:
+ *       - in: path
+ *         name: medicoId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Detalle del médico obtenido
+ *       404:
+ *         description: Médico no encontrado
+ */
+router.get('/:medicoId', defaultCacheMiddleware(900, 'medicos'), controller.obtenerDetalle);
+
 
 export default router;
