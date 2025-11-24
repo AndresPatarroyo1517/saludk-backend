@@ -96,7 +96,7 @@ export const registroMedicoSchema = Joi.object({
       .required(),
     password: Joi.string()
       .min(8)
-      .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])/)
+      .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*?])/)
       .required()
   }).required(),
 

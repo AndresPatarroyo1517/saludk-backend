@@ -49,7 +49,7 @@ const controller = new MedicoController();
  *       200:
  *         description: Lista de médicos obtenida exitosamente
  */
-router.get('/', defaultCacheMiddleware(600, 'medicos'), controller.listarMedicos);
+router.get('/', defaultCacheMiddleware(60, 'medicos'), controller.listarMedicos);
 
 /**
  * @swagger
