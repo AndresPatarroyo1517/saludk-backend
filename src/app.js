@@ -50,8 +50,6 @@ app.use(helmet({
 
 const corsOptions = {
   origin: (origin, callback) => {
-
-    // Si estamos en desarrollo → permitir localhost
     const isDev = process.env.NODE_ENV !== 'production';
 
     const allowedOrigins = isDev
@@ -60,10 +58,6 @@ const corsOptions = {
           ? process.env.FRONTEND_URL.split(',').map(o => o.trim())
           : []
         );
-
-    if (!origin) {
-      return callback(null, true);
-    }
 
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
