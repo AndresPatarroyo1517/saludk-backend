@@ -95,7 +95,7 @@ export const setAuthCookies = (res, accessToken, refreshToken, rememberMe = fals
   const commonCookieOptions = {
     httpOnly: true,
     secure: isProduction, // true en producción (HTTPS)
-    sameSite: 'none', // IMPORTANTE: 'none' para cross-origin
+    sameSite: 'lax', // IMPORTANTE: 'none' para cross-origin
     path: '/',
   };
 
@@ -118,7 +118,7 @@ export const clearAuthCookies = (res) => {
   const commonClearOptions = {
     httpOnly: true,
     secure: isProduction,
-    sameSite:'none',
+    sameSite:'lax',
     path: '/',
   };
 

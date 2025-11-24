@@ -1,4 +1,3 @@
-// controllers/medicoController.js
 import MedicoService from '../services/medicoService.js';
 
 class MedicoController {
@@ -159,6 +158,27 @@ class MedicoController {
     }
   };
 
+  eliminarDisponibilidad = async (req, res) => {
+    try {
+      const { disponibilidadId } = req.params;
+      console.log("REQ.PARAMS COMPLETO:", req.params);
+console.log("disponibilidadId =", req.params.disponibilidadId);
+
+
+      const resultado = await this.service.eliminarDisponibilidad(disponibilidadId);
+
+      res.status(200).json({
+        success: true,
+        data: resultado
+      });
+    } catch (error) {
+      console.error('Error al eliminar disponibilidad: - medicoController.js:172', error);
+      res.status(500).json({
+        error: 'Error al eliminar disponibilidad',
+        mensaje: error.message
+      });
+    }
+  };
   // Actualizar médico
   actualizarMedico = async (req, res) => {
     try {

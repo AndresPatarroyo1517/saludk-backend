@@ -1,4 +1,3 @@
-// services/medicoService.js
 import MedicoRepository from '../repositories/medicoRepository.js';
 import registroService from './registroService.js';
 
@@ -288,6 +287,10 @@ class MedicoService {
 
     return detalle;
   }
+
+    async eliminarDisponibilidad(disponibilidadId) {
+      return await this.repository.eliminarDisponibilidad(disponibilidadId);
+    }
 
   async actualizarMedico(medicoId, datos) {
     // Validar duplicados si vienen email, numero_identificacion o registro_medico

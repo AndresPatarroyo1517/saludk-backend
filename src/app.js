@@ -50,28 +50,34 @@ app.use(helmet({
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // En desarrollo permitir cualquier origen
-    if (process.env.NODE_ENV !== 'production') {
+
+    // Si estamos en desarrollo → permitir localhost
+    const isDev = process.env.NODE_ENV !== 'production';
+
+    const allowedOrigins = isDev
+      ? ['http://localhost:4000', 'http://127.0.0.1:4000', 'http://localhost:3000', 'http://127.0.0.1:3000']
+      : (process.env.FRONTEND_URL
+          ? process.env.FRONTEND_URL.split(',').map(o => o.trim())
+          : []
+        );
+
+    if (!origin) {
       return callback(null, true);
     }
 
-    const allowedOrigins = process.env.FRONTEND_URL
-      ? process.env.FRONTEND_URL.split(',').map(o => o.trim())
-      : [
-          'http://localhost:4000'
-        ];
-
-    if (origin && allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
     }
+
+    return callback(new Error(`CORS blocked: ${origin}`));
   },
+
   credentials: true,
   optionsSuccessStatus: 200,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
+  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization','X-Request-ID'],
 };
+
 
 
 app.use(cors(corsOptions));
